@@ -93,6 +93,10 @@ async function main() {
     const entityTurnedOn$ = entityId => haRx.stateTriggers$({ entityId, to: "on" })
     const entityTurnedOff$ = entityId => haRx.stateTriggers$({ entityId, to: "off" })
 
+    const booleanEntityTrue$ = entityId => entityState$(entityId)
+        .filter(R.is(String))
+        .map(binarayStringToBoolean)
+
     const anyBooleanEntityTrue$ = entityIds => Kefir.combine(R.map(entityState$, entityIds))
         .map(R.map(binarayStringToBoolean))
         .map(anyBooleanInArrayTrue)
@@ -135,7 +139,7 @@ async function main() {
 
     const turnLightsOn = entityId => haRx.callService("light", "turn_on", { entity_id: entityId })
     const turnLightsOff = entityId => haRx.callService("light", "turn_off", { entity_id: entityId })
-    const turnLightsOnWithBrightness = entityId => brightness => haRx.callService("light", "turn_on", { entity_id: entityId }, { brightness_pct: brightness })
+    const turnLightsOnWithBrightness = R.curry((entityId, brightness) => haRx.callService("light", "turn_on", { entity_id: entityId }, { brightness_pct: brightness }))
 
     const toggleLightsWithEvent = (toggleEvent$, lights) => {
         toggleEvent$
@@ -154,7 +158,7 @@ async function main() {
 
 
     // nighttime
-    const nigthtTimeEnabled$ = entityState$("binary_sensor.night_time");
+    const nigthtTimeEnabled$ = booleanEntityTrue$("binary_sensor.night_time");
 
     // devices
     const tradfriRemote = entityId => {
@@ -164,6 +168,10 @@ async function main() {
         }
     }
 
+    // automation config
+    const automationEnabledEntityId = automationId => "input_boolean.automations_" + automationId
+    const automationEnabled$ = automationId => booleanEntityTrue$(automationEnabledEntityId(automationId))
+
     // motion light
     const motionDetected$ = entityIds => anyBooleanEntityTrue$(entityIds)
     const motionGone$ = entityIds => anyBooleanEntityTrue$(entityIds)
@@ -171,8 +179,6 @@ async function main() {
         .map(R.not)
         // presence gone event will be sent only after 5 minutes of inactivity
         .debounce(300 * 1000)
-
-    const automationEnabledEntityId = automationId => "input_boolean." + id
 
     const motionLight = (id, motionSensors, luminousitySensors, allLights, reactiveLights, nightReactiveLights) => {
         const logger = log(id)
@@ -187,34 +193,34 @@ async function main() {
             .filterBy(anyLightsOff$(allLights))
             .onValue(logger("all lights off"))
             // only trigger when motion light is enabled for this room
-            .filterBy(entityState$(automationEnabledEntityId(id)))
+            .filterBy(automationEnabled$(id))
+            .onValue(logger("motion light automation enabled"))
 
         enableMotionLight$
             .filterBy(nigthtTimeEnabled$)
             .onValue(_ => {
-                turnLightsOnWithBrightness(nightReactiveLights, 10);
-                logger("turn nightlights on", _)
+                turnLightsOnWithBrightness(nightReactiveLights, 1);
+                logger("turn nightlights on", _);
             })
 
         enableMotionLight$
             .filterBy(nigthtTimeEnabled$.map(R.not))
             .onValue(_ => {
                 turnLightsOn(reactiveLights);
-                logger("turn lights on", _)
+                logger("turn lights on", _);
             })
 
         const disableMotionLight$ = motionGone$(motionSensors)
             // do not react on motionGone = false events
             .filter(R.identity)
             // only trigger when motion light is enabled for this room
-            .filterBy(entityState$(automationEnabledEntityId(id)))
+            .filterBy(automationEnabled$(id))
             .onValue(_ => {
                 turnLightsOff(allLights);
                 logger("turn lights off", _)
             });
     }
-
-
+    
     // home
     const areaIds = R.map(R.prop("area_id"), areas)
     const getAreaDevices = areaId => {
@@ -244,7 +250,7 @@ async function main() {
         'waschezimmer'
     ].forEach(area => {
         motionLight(
-            logger("motionlight_" + area),
+            "motionlight_" + area,
             home[area].motionSensors,
             home[area].luminositySesnors,
             home[area].lights,

@@ -13,6 +13,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "homeassistant": "^0.2.0",
     "homeassistant-rx": "^1.0.1"
   }
 }

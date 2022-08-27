@@ -89,10 +89,6 @@ async function main() {
     const entityState$ = entityId => stateOfEntity$(haRx)(entityId)
         .map(R.prop("state"))
 
-    const entityChangedto$ = newValue => entityId => haRx.stateTriggers$({ entityId, to: newValue })
-    const entityTurnedOn$ = entityId => haRx.stateTriggers$({ entityId, to: "on" })
-    const entityTurnedOff$ = entityId => haRx.stateTriggers$({ entityId, to: "off" })
-
     const booleanEntityTrue$ = entityId => entityState$(entityId)
         .filter(R.is(String))
         .map(binarayStringToBoolean)

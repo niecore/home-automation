@@ -238,6 +238,11 @@ async function main() {
     toggleLightsWithEvent(tradfriRemote("sensor.remote_tradfri_4_action").toggle$, home.buro.lights);
     toggleLightsWithEvent(tradfriRemote("sensor.remote_tradfri_5_action").toggle$, home.wohnzimmer.lights);
 
+    // mailbox notification
+    entityState$("contact_aqara_4_contact")
+        .filter(R.equals("off"))
+        .onValue(_ => notify("mailbox has been opened"))
+
     const roomsWithMotionLight = [
         'wohnzimmer',
         'kuche',

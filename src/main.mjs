@@ -84,6 +84,7 @@ async function main() {
 
     const isLight = isEntityType("light")
     const isMotionSensor = R.allPass([isEntityType("binary_sensor"), hasDeviceClass("occupancy")])
+    const isWindowSensor = R.allPass([isEntityType("binary_sensor"), hasDeviceClass("window")])
     const isLuminositySensor = R.allPass([isEntityType("sensor"), hasDeviceClass("illuminance")])
 
     const entityState$ = entityId => stateOfEntity$(haRx)(entityId)
@@ -128,6 +129,7 @@ async function main() {
     const getLightsOfArea = getEntitiesOfAreaAndFilter(isLight)
     const getMotionSensorsOfArea = getEntitiesOfAreaAndFilter(isMotionSensor)
     const getLuminositySensorsOfArea = getEntitiesOfAreaAndFilter(isLuminositySensor)
+    const getWindowSensorsOfArea = getEntitiesOfAreaAndFilter(isWindowSensor)
 
     // notifications
     const notify = message => haRx.callService("notify", "telegram_message", {}, { message: message })
@@ -226,7 +228,8 @@ async function main() {
         return {
             lights: getLightsOfArea(devices, entities)(areaId),
             motionSensors: getMotionSensorsOfArea(devices, entities)(areaId),
-            luminositySesnors: getLuminositySensorsOfArea(devices, entities)(areaId)
+            luminositySesnors: getLuminositySensorsOfArea(devices, entities)(areaId),
+            windowSensors: getWindowSensorsOfArea(devices, entities)(areaId)
         }
     }
     const home = objectMap(getAreaDevices)(areaIds)
@@ -262,6 +265,16 @@ async function main() {
             home[area].lights
         )
     });
+
+    // rain notification
+    const weatherForacest$ = entityState$("weather.home_hourly").skipDuplicates()
+    const rainForecast$ = weatherForacest$.filter(R.equals("rainy"))
+
+    const roofWindowOpen$ = anyBooleanEntityTrue$(R.concat(home["waschezimmer"].windowSensors, home["schlafzimmer"].windowSensors))
+
+    rainForecast$
+        .filterBy(roofWindowOpen$)
+        .onValue(_ => notify("rain predected and roof windows open"))
 }
 
 main()

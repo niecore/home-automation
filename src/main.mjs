@@ -129,6 +129,9 @@ async function main() {
     const getMotionSensorsOfArea = getEntitiesOfAreaAndFilter(isMotionSensor)
     const getLuminositySensorsOfArea = getEntitiesOfAreaAndFilter(isLuminositySensor)
 
+    // notifications
+    const notify = message => haRx.callService("notify", "telegram_message", {}, { message: message })
+
     // lights
     const anyLightsOn$ = anyBooleanEntityTrue$
     const anyLightsOff$ = entityIds => anyLightsOn$(entityIds).map(R.not)

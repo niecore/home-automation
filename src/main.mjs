@@ -2,6 +2,7 @@ import homeassistantRx from "homeassistant-rx";
 import homeassistant from "homeassistant"
 import * as R from "ramda";
 import * as Kefir from "kefir";
+import filterByLogged from "./filterByLogged.mjs";
 
 
 async function main() {
@@ -136,7 +137,7 @@ async function main() {
 
     // lights
     const anyLightsOn$ = anyBooleanEntityTrue$
-    const anyLightsOff$ = entityIds => anyLightsOn$(entityIds).map(R.not)
+    const allLightsOff$ = entityIds => anyLightsOn$(entityIds).map(R.not)
 
     const turnLightsOn = entityId => haRx.callService("light", "turn_on", { entity_id: entityId })
     const turnLightsOff = entityId => haRx.callService("light", "turn_off", { entity_id: entityId })
@@ -144,12 +145,17 @@ async function main() {
 
     const toggleLightsWithEvent = (toggleEvent$, lights) => {
         toggleEvent$
-            .filterBy(anyLightsOff$(lights))
+            .filterBy(allLightsOff$(lights))
             .onValue(_ => turnLightsOn(lights))
 
         toggleEvent$
             .filterBy(anyLightsOn$(lights))
             .onValue(_ => turnLightsOff(lights))
+    }
+
+    const switchLightsWithEvents = (onEvent$, offEvent$, lights) => {
+        onEvent$.onValue(_ => turnLightsOn(lights))
+        offEvent$.onValue(_ => turnLightsOff(lights))
     }
 
     // illuminance
@@ -166,6 +172,14 @@ async function main() {
         const deviceStream = entityState$(entityId)
         return {
             toggle$: deviceStream.filter(R.equals("toggle"))
+        }
+    }
+
+    const tradfriRemoteSmall = entityId => {
+        const deviceStream = entityState$(entityId)
+        return {
+            on$: deviceStream.filter(R.equals("on")),
+            off$: deviceStream.filter(R.equals("off"))
         }
     }
 
@@ -186,16 +200,11 @@ async function main() {
         const enableMotionLight$ = motionDetected$(motionSensors)
             // do not react on motionDetected = false events
             .filter(R.identity)
-            .onValue(logger("motion detected"))
+            .log(id + ": motion detected")
             // only trigger when luminosity is too low
-            .filterBy(luminousityInRoomToLow$(luminousitySensors))
-            .onValue(logger("room to dark"))
-            // only trigger when given lights are off
-            .filterBy(anyLightsOff$(allLights))
-            .onValue(logger("all lights off"))
-            // only trigger when motion light is enabled for this room
-            .filterBy(automationEnabled$(id))
-            .onValue(logger("motion light automation enabled"))
+            .thru(filterByLogged(id + ": luminosity in room to low", luminousityInRoomToLow$(luminousitySensors)))
+            .thru(filterByLogged(id + ": all lights off", allLightsOff$(allLights)))
+            .thru(filterByLogged(id + ": motion light enabled ", automationEnabled$(id)))
 
         enableMotionLight$
             .filterBy(nigthtTimeEnabled$)
@@ -241,6 +250,11 @@ async function main() {
     toggleLightsWithEvent(tradfriRemote("sensor.remote_tradfri_4_action").toggle$, home.buro.lights);
     toggleLightsWithEvent(tradfriRemote("sensor.remote_tradfri_5_action").toggle$, home.wohnzimmer.lights);
 
+    const bedroomRemoteRight = tradfriRemoteSmall("sensor.remote_tradfri_small_2_action")
+    const bedroomRemoteLeft = tradfriRemoteSmall("sensor.remote_tradfri_small_1_action")
+    switchLightsWithEvents(bedroomRemoteRight.on$, bedroomRemoteRight.off$, ["light.lightbulb_tradfriw_9_light"])
+    switchLightsWithEvents(bedroomRemoteLeft.on$, bedroomRemoteLeft.off$, ["light.lightbulb_tradfriw_8_light"])
+    
     // mailbox notification
     entityState$("contact_aqara_4_contact")
         .filter(R.equals("off"))
@@ -255,7 +269,9 @@ async function main() {
         'speisekammer',
         'buro',
         'waschezimmer'
-    ].forEach(area => {
+    ];
+    
+    roomsWithMotionLight.forEach(area => {
         motionLight(
             "motionlight_" + area,
             home[area].motionSensors,
@@ -267,13 +283,13 @@ async function main() {
     });
 
     // rain notification
+    const roofWindowOpen$ = anyBooleanEntityTrue$(R.concat(home["waschezimmer"].windowSensors, home["schlafzimmer"].windowSensors))
     const weatherForacest$ = entityState$("weather.home_hourly").skipDuplicates()
     const rainForecast$ = weatherForacest$.filter(R.equals("rainy"))
 
-    const roofWindowOpen$ = anyBooleanEntityTrue$(R.concat(home["waschezimmer"].windowSensors, home["schlafzimmer"].windowSensors))
-
     rainForecast$
-        .filterBy(roofWindowOpen$)
+        .log("rain forecast: ")
+        .thru(filterByLogged("rain forecast: roof windows open", roofWindowOpen$))
         .onValue(_ => notify("rain predected and roof windows open"))
 }
 

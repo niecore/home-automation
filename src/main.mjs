@@ -2,8 +2,8 @@ import homeassistantRx from "homeassistant-rx";
 import homeassistant from "homeassistant"
 import * as R from "ramda";
 import * as Kefir from "kefir";
-import filterByLogged from "./filterByLogged.mjs";
-
+import filterByLogged from "./util/filterByLogged.mjs";
+import throttleOncePerDay from "./util/throttleOncePerDay.mjs"
 
 async function main() {
 
@@ -86,6 +86,7 @@ async function main() {
     const isLight = isEntityType("light")
     const isMotionSensor = R.allPass([isEntityType("binary_sensor"), hasDeviceClass("occupancy")])
     const isWindowSensor = R.allPass([isEntityType("binary_sensor"), hasDeviceClass("window")])
+    const isDoorSensor = R.allPass([isEntityType("binary_sensor"), hasDeviceClass("door")])
     const isLuminositySensor = R.allPass([isEntityType("sensor"), hasDeviceClass("illuminance")])
 
     const entityState$ = entityId => stateOfEntity$(haRx)(entityId)
@@ -183,10 +184,23 @@ async function main() {
         }
     }
 
+    // home
+    const areaIds = R.map(R.prop("area_id"), areas)
+    const getAreaDevices = areaId => {
+        return {
+            lights: getLightsOfArea(devices, entities)(areaId),
+            motionSensors: getMotionSensorsOfArea(devices, entities)(areaId),
+            luminositySesnors: getLuminositySensorsOfArea(devices, entities)(areaId),
+            windowSensors: getWindowSensorsOfArea(devices, entities)(areaId)
+        }
+    }
+    const home = objectMap(getAreaDevices)(areaIds)
+
     // automation config
     const automationEnabledEntityId = automationId => "input_boolean.automations_" + automationId
     const automationEnabled$ = automationId => booleanEntityTrue$(automationEnabledEntityId(automationId))
-
+    const filterAutomationEnabled = automationId => filterByLogged(automationId + ": enabled ", automationEnabled$(automationId))
+    
     // motion light
     const motionDetected$ = entityIds => anyBooleanEntityTrue$(entityIds)
     const motionGone$ = entityIds => anyBooleanEntityTrue$(entityIds)
@@ -204,46 +218,40 @@ async function main() {
             // only trigger when luminosity is too low
             .thru(filterByLogged(id + ": luminosity in room to low", luminousityInRoomToLow$(luminousitySensors)))
             .thru(filterByLogged(id + ": all lights off", allLightsOff$(allLights)))
-            .thru(filterByLogged(id + ": motion light enabled ", automationEnabled$(id)))
-
-        enableMotionLight$
-            .filterBy(nigthtTimeEnabled$)
+            .thru(filterAutomationEnabled(id))
             .onValue(_ => {
-                turnLightsOnWithBrightness(nightReactiveLights, 1);
-                logger("turn nightlights on", _);
-            })
-
-        enableMotionLight$
-            .filterBy(nigthtTimeEnabled$.map(R.not))
-            .onValue(_ => {
+                // turn lights on
                 turnLightsOn(reactiveLights);
                 logger("turn lights on", _);
             })
-
-        const disableMotionLight$ = motionGone$(motionSensors)
-            // do not react on motionGone = false events
-            .filter(R.identity)
-            // only trigger when motion light is enabled for this room
-            .filterBy(automationEnabled$(id))
             .onValue(_ => {
-                turnLightsOff(allLights);
-                logger("turn lights off", _)
-            });
+                // turn lights off (later)
+                motionGone$(motionSensors)
+                    // do not react on motionGone = false events
+                    .filter(R.identity)
+                    // only trigger when motion light is enabled for this room
+                    .onValue(_ => {
+                        turnLightsOff(allLights);
+                        logger("turn lights off", _)
+                    })
+                    // turn off only once
+                    .take(1);
+            }) 
     }
     
-    // home
-    const areaIds = R.map(R.prop("area_id"), areas)
-    const getAreaDevices = areaId => {
-        return {
-            lights: getLightsOfArea(devices, entities)(areaId),
-            motionSensors: getMotionSensorsOfArea(devices, entities)(areaId),
-            luminositySesnors: getLuminositySensorsOfArea(devices, entities)(areaId),
-            windowSensors: getWindowSensorsOfArea(devices, entities)(areaId)
-        }
-    }
-    const home = objectMap(getAreaDevices)(areaIds)
+    areaIds.forEach(area => {
+        motionLight(
+            "motionlight_" + area,
+            home[area].motionSensors,
+            home[area].luminositySesnors,
+            home[area].lights,
+            home[area].lights,
+            home[area].lights
+        )
+    });    
 
-    // toggle Area LIghts
+
+    // light controls
     toggleLightsWithEvent(tradfriRemote("sensor.remote_tradfri_1_action").toggle$, home.wohnzimmer.lights);
     toggleLightsWithEvent(tradfriRemote("sensor.remote_tradfri_2_action").toggle$, home.schlafzimmer.lights);
     toggleLightsWithEvent(tradfriRemote("sensor.remote_tradfri_3_action").toggle$, home.kuche.lights);
@@ -255,42 +263,37 @@ async function main() {
     switchLightsWithEvents(bedroomRemoteRight.on$, bedroomRemoteRight.off$, ["light.lightbulb_tradfriw_9_light"])
     switchLightsWithEvents(bedroomRemoteLeft.on$, bedroomRemoteLeft.off$, ["light.lightbulb_tradfriw_8_light"])
     
+
     // mailbox notification
-    entityState$("contact_aqara_4_contact")
+    entityState$("binary_sensor.contact_aqara_4_contact")
+        .thru(filterAutomationEnabled("mailbox_notification"))
+        .thru(throttleOncePerDay)
         .filter(R.equals("off"))
         .onValue(_ => notify("mailbox has been opened"))
 
-    const roomsWithMotionLight = [
-        'wohnzimmer',
-        'kuche',
-        'schlafzimmer',
-        'flur',
-        'treppenhaus',
-        'speisekammer',
-        'buro',
-        'waschezimmer'
-    ];
-    
-    roomsWithMotionLight.forEach(area => {
-        motionLight(
-            "motionlight_" + area,
-            home[area].motionSensors,
-            home[area].luminositySesnors,
-            home[area].lights,
-            home[area].lights,
-            home[area].lights
-        )
-    });
 
-    // rain notification
+    // open window rain alert
     const roofWindowOpen$ = anyBooleanEntityTrue$(R.concat(home["waschezimmer"].windowSensors, home["schlafzimmer"].windowSensors))
     const weatherForacest$ = entityState$("weather.home_hourly").skipDuplicates()
     const rainForecast$ = weatherForacest$.filter(R.equals("rainy"))
-
     rainForecast$
         .log("rain forecast: ")
         .thru(filterByLogged("rain forecast: roof windows open", roofWindowOpen$))
+        .thru(filterAutomationEnabled("open_window_rain_alert"))
         .onValue(_ => notify("rain predected and roof windows open"))
+
+
+    // open window alert
+    const displayNameFromEvent = ev => R.pathOr(ev.entity_id, ["attributes", "friendly_name"], ev)
+    const allWindowContactSensors = R.filter(R.anyPass([isDoorSensor, isWindowSensor]), entities);
+    allWindowContactSensors.forEach(sensor => {
+        stateOfEntity$(haRx)(sensor.entity_id)
+            .throttle(15*60*1000, {leading: false}) // 15 min
+            .filter(R.propEq("state", "on"))
+            .thru(filterAutomationEnabled("open_window_alert"))
+            .onValue(ev => notify("window open for longer than 15 minutes: " + displayNameFromEvent(ev)))
+    }); 
+
 }
 
 main()

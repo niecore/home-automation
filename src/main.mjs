@@ -62,6 +62,7 @@ async function main() {
             .map(R.map(obj => R.objOf(obj.entity_id, obj)))
             .map(R.mergeAll)
             .map(R.prop(entityId))
+            .toProperty()
 
         const stateChanges = haRx.events$("state_changed")
             .filter(isEntity(entityId))
@@ -203,11 +204,11 @@ async function main() {
     
     // motion light
     const motionDetected$ = entityIds => anyBooleanEntityTrue$(entityIds)
-    const motionGone$ = entityIds => anyBooleanEntityTrue$(entityIds)
+    const motionGone$ = entityIds => motionDetected$(entityIds)
         // all entities have to be off
         .map(R.not)
-        // presence gone event will be sent only after 5 minutes of inactivity
-        .debounce(300 * 1000)
+        // presence gone event will be sent only after 10 minutes of inactivity
+        .debounce(600 * 1000)
 
     const motionLight = (id, motionSensors, luminousitySensors, allLights, reactiveLights, nightReactiveLights) => {
         const logger = log(id)
@@ -280,7 +281,7 @@ async function main() {
         .log("rain forecast: ")
         .thru(filterByLogged("rain forecast: roof windows open", roofWindowOpen$))
         .thru(filterAutomationEnabled("open_window_rain_alert"))
-        .onValue(_ => notify("rain predected and roof windows open"))
+        .onValue(_ => notify("rain predicted and roof windows open"))
 
 
     // open window alert
@@ -288,12 +289,33 @@ async function main() {
     const allWindowContactSensors = R.filter(R.anyPass([isDoorSensor, isWindowSensor]), entities);
     allWindowContactSensors.forEach(sensor => {
         stateOfEntity$(haRx)(sensor.entity_id)
-            .throttle(15*60*1000, {leading: false}) // 15 min
+            .debounce(15*60*1000) // 15 min
             .filter(R.propEq("state", "on"))
             .thru(filterAutomationEnabled("open_window_alert"))
             .onValue(ev => notify("window open for longer than 15 minutes: " + displayNameFromEvent(ev)))
     }); 
 
+    // light power safe
+    areaIds.forEach(area => {
+        const lightShutOffTimeout = 90*60*1000; // 90 min
+        const automationId = "light_power_safe_" + area;
+
+        const motionGoneInArea$ = motionGone$(home[area].motionSensors)
+            .debounce(lightShutOffTimeout)
+            .log(automationId + ": motion gone for long time")
+
+        home[area].lights.forEach(light => {
+            const lightOnToLong$ = entityState$(light)
+                .debounce(lightShutOffTimeout)
+                .filter(R.equals("on"))
+                .log(automationId + ": light on for long time")
+
+            lightOnToLong$
+                .combine(motionGoneInArea$, R.and)
+                .thru(filterAutomationEnabled(automationId))
+                .onValue(_ => turnLightsOff([light]))
+        })
+    });
 }
 
 main()

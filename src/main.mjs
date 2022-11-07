@@ -260,8 +260,8 @@ async function main() {
 
     const bedroomRemoteRight = tradfriRemoteSmall("sensor.remote_tradfri_small_2_action")
     const bedroomRemoteLeft = tradfriRemoteSmall("sensor.remote_tradfri_small_1_action")
-    switchLightsWithEvents(bedroomRemoteRight.on$, bedroomRemoteRight.off$, ["light.lightbulb_tradfriw_9_light"])
-    switchLightsWithEvents(bedroomRemoteLeft.on$, bedroomRemoteLeft.off$, ["light.lightbulb_tradfriw_8_light"])
+    switchLightsWithEvents(bedroomRemoteRight.on$, bedroomRemoteRight.off$, ["light.lightbulb_tradfriw_9"])
+    switchLightsWithEvents(bedroomRemoteLeft.on$, bedroomRemoteLeft.off$, ["light.lightbulb_tradfriw_8"])
     
 
     // mailbox notification

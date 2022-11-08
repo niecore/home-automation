@@ -1,7 +1,8 @@
 import * as R from "ramda";
+import {streamLogger} from "./logger.mjs"
 
 const filterByLogged = (logFilter, filter$) => obs$ => {
-    filter$.onValue(val => console.log(logFilter + ": " + val))
+    filter$.onValue(streamLogger(logFilter))
     return obs$.filterBy(filter$);
 }
 

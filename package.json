@@ -15,6 +15,7 @@
   "dependencies": {
     "homeassistant": "^0.2.0",
     "homeassistant-rx": "^1.1.0",
-    "reconnecting-websocket": "^4.4.0"
+    "reconnecting-websocket": "^4.4.0",
+    "winston": "^3.8.2"
   }
 }

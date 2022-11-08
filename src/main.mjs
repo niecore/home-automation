@@ -4,9 +4,9 @@ import * as R from "ramda";
 import * as Kefir from "kefir";
 import filterByLogged from "./util/filterByLogged.mjs";
 import throttleOncePerDay from "./util/throttleOncePerDay.mjs"
+import {streamLogger} from "./util/logger.mjs"
 
 async function main() {
-
     const haRx = homeassistantRx({
         hostname: "192.168.0.101",
         port: 8123,
@@ -39,9 +39,6 @@ async function main() {
         R.map(x => [x, fnc(x)]),
         R.fromPairs
     )
-
-    // logging
-    const log = id => msg => value => console.log(id + ": " + msg + " stream_value: " + value);
 
     // states
     const allStates$ = haRx => {
@@ -211,30 +208,23 @@ async function main() {
         .debounce(600 * 1000)
 
     const motionLight = (id, motionSensors, luminousitySensors, allLights, reactiveLights, nightReactiveLights) => {
-        const logger = log(id)
         const enableMotionLight$ = motionDetected$(motionSensors)
             // do not react on motionDetected = false events
             .filter(R.identity)
-            .log(id + ": motion detected")
+            .onValue(streamLogger(`${id} motion detected`))
             // only trigger when luminosity is too low
-            .thru(filterByLogged(id + ": luminosity in room to low", luminousityInRoomToLow$(luminousitySensors)))
-            .thru(filterByLogged(id + ": all lights off", allLightsOff$(allLights)))
+            .thru(filterByLogged(`${id} luminosity in room to low`, luminousityInRoomToLow$(luminousitySensors)))
+            .thru(filterByLogged(`${id} all lights off`, allLightsOff$(allLights)))
             .thru(filterAutomationEnabled(id))
-            .onValue(_ => {
-                // turn lights on
-                turnLightsOn(reactiveLights);
-                logger("turn lights on", _);
-            })
+            .onValue(streamLogger(`${id} turn lights on`))
+            .onValue(_ => turnLightsOn(reactiveLights))
             .onValue(_ => {
                 // turn lights off (later)
                 motionGone$(motionSensors)
                     // do not react on motionGone = false events
                     .filter(R.identity)
-                    // only trigger when motion light is enabled for this room
-                    .onValue(_ => {
-                        turnLightsOff(allLights);
-                        logger("turn lights off", _)
-                    })
+                    .onValue(streamLogger(`${id} turn lights off`))
+                    .onValue(_ =>  turnLightsOff(allLights))
                     // turn off only once
                     .take(1);
             }) 
@@ -277,22 +267,24 @@ async function main() {
     const roofWindowOpen$ = anyBooleanEntityTrue$(R.concat(home["waschezimmer"].windowSensors, home["schlafzimmer"].windowSensors))
     const weatherForacest$ = entityState$("weather.home_hourly").skipDuplicates()
     const rainForecast$ = weatherForacest$.filter(R.equals("rainy"))
+    const windowRainAlertId = "open_window_rain_alert"
     rainForecast$
-        .log("rain forecast: ")
-        .thru(filterByLogged("rain forecast: roof windows open", roofWindowOpen$))
-        .thru(filterAutomationEnabled("open_window_rain_alert"))
+        .onValue(streamLogger(`${windowRainAlertId} rain predicted`))
+        .thru(filterByLogged(`${windowRainAlertId} roof windows open`, roofWindowOpen$))
+        .thru(filterAutomationEnabled(windowRainAlertId))
         .onValue(_ => notify("rain predicted and roof windows open"))
 
 
     // open window alert
     const displayNameFromEvent = ev => R.pathOr(ev.entity_id, ["attributes", "friendly_name"], ev)
     const allWindowContactSensors = R.filter(R.anyPass([isDoorSensor, isWindowSensor]), entities);
+    const openWindowAlertId = "open_window_alert";
     allWindowContactSensors.forEach(sensor => {
         stateOfEntity$(haRx)(sensor.entity_id)
             .debounce(15*60*1000) // 15 min
             .filter(R.propEq("state", "on"))
-            .thru(filterAutomationEnabled("open_window_alert"))
-            .onValue(ev => notify("window open for longer than 15 minutes: " + displayNameFromEvent(ev)))
+            .thru(filterAutomationEnabled(openWindowAlertId))
+            .onValue(ev => notify(`window open for longer than 15 minutes: ${displayNameFromEvent(ev)}`))
     }); 
 
     // light power safe
@@ -302,17 +294,18 @@ async function main() {
 
         const motionGoneInArea$ = motionGone$(home[area].motionSensors)
             .debounce(lightShutOffTimeout)
-            .log(automationId + ": motion gone for long time")
+            .onValue(streamLogger(`${automationId} motion gone for long time`))
 
         home[area].lights.forEach(light => {
             const lightOnToLong$ = entityState$(light)
                 .debounce(lightShutOffTimeout)
                 .filter(R.equals("on"))
-                .log(automationId + ": light on for long time")
+                .onValue(streamLogger(`${automationId} light on for long time`))
 
             lightOnToLong$
                 .combine(motionGoneInArea$, R.and)
                 .thru(filterAutomationEnabled(automationId))
+                .onValue(streamLogger(`${automationId} turning light off ${light}`))
                 .onValue(_ => turnLightsOff([light]))
         })
     });

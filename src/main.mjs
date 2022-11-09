@@ -312,6 +312,13 @@ async function main() {
                 .onValue(_ => turnLightsOff([light]))
         })
     });
+
+    // media automation scenes
+    const tvTurnedOn$ = entityState$("select.harmony_hub_activities")
+        .filter(val => val != "PowerOff")
+     
+    tvTurnedOn$.onValue(_ => turnLightsOff(["light.shellydimmer_db338b"]))
+    
 }
 
 main()

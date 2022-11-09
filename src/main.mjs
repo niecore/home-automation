@@ -256,10 +256,12 @@ async function main() {
     
 
     // mailbox notification
+    const mailBoxNotificationId = "mailbox_notification"
     entityState$("binary_sensor.contact_aqara_4_contact")
-        .thru(filterAutomationEnabled("mailbox_notification"))
+        .filter(R.equals("on"))
         .thru(throttleOncePerDay)
-        .filter(R.equals("off"))
+        .onValue(streamLogger(`${mailBoxNotificationId}: mailbox opened`))
+        .thru(filterAutomationEnabled(mailBoxNotificationId))
         .onValue(_ => notify("mailbox has been opened"))
 
 

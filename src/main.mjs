@@ -314,9 +314,10 @@ async function main() {
     });
 
     // media automation scenes
-    const tvTurnedOn$ = entityState$("select.harmony_hub_activities")
-        .filter(val => val != "PowerOff")
-     
+    const tvTurnedOff$ = entityState$("select.harmony_hub_activities")
+        .filter(R.equals("PowerOff"))
+    const tvTurnedOn$ = tvTurnedOff$.map(R.not)
+    
     tvTurnedOn$.onValue(_ => turnLightsOff(["light.shellydimmer_db338b"]))
     
 }

@@ -210,7 +210,7 @@ async function main() {
     const motionLight = (id, motionSensors, luminousitySensors, allLights, reactiveLights, nightReactiveLights) => {
         const enableMotionLight$ = motionDetected$(motionSensors)
             // do not react on motionDetected = false events
-            .filter(R.identity)
+            .filter(R.equals(true))
             .onValue(streamLogger(`${id} motion detected`))
             // only trigger when luminosity is too low
             .thru(filterByLogged(`${id} luminosity in room to low`, luminousityInRoomToLow$(luminousitySensors)))
@@ -222,7 +222,7 @@ async function main() {
                 // turn lights off (later)
                 motionGone$(motionSensors)
                     // do not react on motionGone = false events
-                    .filter(R.identity)
+                    .filter(R.equals(true))
                     .onValue(streamLogger(`${id} turn lights off`))
                     .onValue(_ =>  turnLightsOff(allLights))
                     // turn off only once
@@ -298,8 +298,9 @@ async function main() {
 
         home[area].lights.forEach(light => {
             const lightOnToLong$ = entityState$(light)
+                .map(binarayStringToBoolean)
                 .debounce(lightShutOffTimeout)
-                .filter(R.equals("on"))
+                .filter(R.equals(true))
                 .onValue(streamLogger(`${automationId} light on for long time`))
 
             lightOnToLong$

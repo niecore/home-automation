@@ -201,17 +201,14 @@ async function main() {
     
     // motion light
     const motionDetected$ = entityIds => anyBooleanEntityTrue$(entityIds)
+    const motionGone$ = entityIds => motionDetected$(entityIds)
+        // all entities have to be off
+        .map(R.not)
         // presence gone event will be sent only after 10 minutes of inactivity
         .debounce(600 * 1000)
 
-    const motionGone$ =  entityIds => motionDetected$(entityIds)
-        .map(R.not)
-
     const motionLight = (id, motionSensors, luminousitySensors, allLights, reactiveLights, nightReactiveLights) => {
-        const motionInRoom = motionDetected$(motionSensors)
-        const motionGoneInRoom = motionGone$(motionSensors)
-
-        motionInRoom
+        const enableMotionLight$ = motionDetected$(motionSensors)
             // do not react on motionDetected = false events
             .filter(R.equals(true))
             .onValue(streamLogger(`${id} motion detected`))
@@ -223,8 +220,8 @@ async function main() {
             .onValue(_ => turnLightsOn(reactiveLights))
             .onValue(_ => {
                 // turn lights off (later)
-                motionGoneInRoom
-                    // only react on motion gone events
+                motionGone$(motionSensors)
+                    // do not react on motionGone = false events
                     .filter(R.equals(true))
                     .onValue(streamLogger(`${id} turn lights off`))
                     .onValue(_ =>  turnLightsOff(allLights))

@@ -33,7 +33,7 @@ async function main() {
     const combineStreams = Kefir.combine
     const anyBooleanInArrayTrue = R.reduce(R.or, false)
     const allBooleanInArrayTrue = R.reduce(R.and, true)
-    const binarayStringToBoolean = string => string.toLowerCase() !== "off"
+    const binarayStringToBoolean = string => string.toLowerCase() == "on"
 
     const objectMap = fnc => R.pipe(
         R.map(x => [x, fnc(x)]),

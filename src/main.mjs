@@ -200,14 +200,24 @@ async function main() {
     const filterAutomationEnabled = automationId => filterByLogged(automationId + ": enabled ", automationEnabled$(automationId))
     
     // motion light
-    const motionDetected$ = entityIds => anyBooleanEntityTrue$(entityIds)
-    const motionGone$ = entityIds => motionDetected$(entityIds)
-        // all entities have to be off
-        .map(R.not)
-        // presence gone event will be sent only after 10 minutes of inactivity
-        .debounce(600 * 1000)
+    const motionDetected$ = entityIds => {
+        const _detected$ = anyBooleanEntityTrue$(entityIds)
+            .filter(R.equals(true))
+
+        const _gone$ = anyBooleanEntityTrue$(entityIds)
+            // all entities have to be off
+            .map(R.not)
+            // presence gone event will be sent only after 10 minutes of inactivity
+            .debounce(600 * 1000)
+            .filter(R.equals(false))
+
+        return _detected$.merge(_gone$)
+    }
+
+    const motionGone$ = entityIds => motionDetected$(entityIds).map(R.not)
 
     const motionLight = (id, motionSensors, luminousitySensors, allLights, reactiveLights, nightReactiveLights) => {
+        const disableMotionLights$ = motionGone$(motionSensors)
         const enableMotionLight$ = motionDetected$(motionSensors)
             // do not react on motionDetected = false events
             .filter(R.equals(true))
@@ -220,14 +230,14 @@ async function main() {
             .onValue(_ => turnLightsOn(reactiveLights))
             .onValue(_ => {
                 // turn lights off (later)
-                motionGone$(motionSensors)
+                disableMotionLights$
                     // do not react on motionGone = false events
                     .filter(R.equals(true))
                     .onValue(streamLogger(`${id} turn lights off`))
                     .onValue(_ =>  turnLightsOff(allLights))
                     // turn off only once
                     .take(1);
-            }) 
+            })
     }
     
     areaIds.forEach(area => {

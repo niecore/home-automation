@@ -384,10 +384,25 @@ async function main() {
 
     // media automation scenes
     const tvTurnedOff$ = entityState$("select.harmony_hub_activities")
-        .filter(R.equals("PowerOff"))
+        .map(R.equals("PowerOff"))
+
     const tvTurnedOn$ = tvTurnedOff$.map(R.not)
     
-    tvTurnedOn$.onValue(_ => turnLightsOff(["light.shellydimmer_db338b"]))
+    const mediaAutomationId = "forbid_lights_when_tv_on";
+    tvTurnedOn$
+        .thru(filterAutomationEnabled(mediaAutomationId))
+        .onValue(_ => turnLightsOff(["light.shellydimmer_db338b"]))
+
+    booleanEntityTrue$("light.shellydimmer_db338b")
+        .thru(filterAutomationEnabled(mediaAutomationId))
+        // light turned on
+        .filter(R.equals(true))
+        // check if tv on
+        .thru(filterByLogged(`${mediaAutomationId} tv turned on`, tvTurnedOn$))
+        // when light is turned on again within 10 seconds, dont proceed
+        .throttle(10*1000, {leading: true, trailing: false})
+        // turn light off :D
+        .onValue(_ => turnLightsOff("light.shellydimmer_db338b"))      
 }
 
 main()

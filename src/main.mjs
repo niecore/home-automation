@@ -262,7 +262,6 @@ async function main() {
             // presence gone event will be sent only after 10 minutes of inactivity
             .debounce(600 * 1000)
             .filter(R.equals(false))
-            .skipDuplicates()
 
         return _detected$.merge(_gone$)
     }

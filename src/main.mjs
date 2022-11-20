@@ -262,6 +262,7 @@ async function main() {
             // presence gone event will be sent only after 10 minutes of inactivity
             .debounce(600 * 1000)
             .filter(R.equals(false))
+            .skipDuplicates()
 
         return _detected$.merge(_gone$)
     }
@@ -285,10 +286,10 @@ async function main() {
                 disableMotionLights$
                     // do not react on motionGone = false events
                     .filter(R.equals(true))
+                    // turn off only once
+                    .take(1)
                     .onValue(streamLogger(`${id} turn lights off`))
                     .onValue(_ =>  turnLightsOff(allLights))
-                    // turn off only once
-                    .take(1);
             })
     }
     

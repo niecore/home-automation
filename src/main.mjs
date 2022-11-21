@@ -257,8 +257,6 @@ async function main() {
             .filter(R.equals(true))
 
         const _gone$ = anyBooleanEntityTrue$(entityIds)
-            // all entities have to be off
-            .map(R.not)
             // presence gone event will be sent only after 10 minutes of inactivity
             .debounce(600 * 1000)
             .filter(R.equals(false))

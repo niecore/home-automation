@@ -269,11 +269,9 @@ async function main() {
     const motionLight = (id, motionSensors, luminositySensors, allLights, reactiveLights, nightReactiveLights) => {
         const disableMotionLights$ = motionGone$(motionSensors)
         const enableMotionLight$ = motionDetected$(motionSensors)
-            // do not react on motionDetected = false events
-            .filter(R.equals(true))
             .onValue(streamLogger(`${id} motion detected`))
-            // only trigger when luminosity is too low
-            .thru(filterByLogged(`${id} luminosity in room to low`, luminousityInRoomToLow$(luminositySensors)))
+            .combine(luminousityInRoomToLow$(luminositySensors), R.and)
+            .filter(R.equals(true))
             .thru(filterByLogged(`${id} all lights off`, allLightsOff$(allLights)))
             .thru(filterAutomationEnabled(id))
             .onValue(streamLogger(`${id} turn lights on`))

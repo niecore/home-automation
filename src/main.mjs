@@ -357,22 +357,20 @@ async function main() {
         .filter(roomHasLights)
         .filter(roomHasMotionSensors)
         .forEach(room => {
-            const lightShutOffTimeout = 90*60*1000; // 90 min
-            const automationId = "light_power_safe_" + room;
+            const lightShutOffTimeout = 30*60*1000; // 30 min
+            const automationId = "light_power_safe";
 
             const motionGoneInArea$ = motionGone$(home[room].motionSensors)
                 .debounce(lightShutOffTimeout)
-                .onValue(streamLogger(`${automationId} motion gone for long time`))
 
             home[room].lights.forEach(light => {
                 const lightOnToLong$ = entityState$(light)
                     .map(binarayStringToBoolean)
                     .debounce(lightShutOffTimeout)
-                    .filter(R.equals(true))
-                    .onValue(streamLogger(`${automationId} light on for long time`))
 
                 lightOnToLong$
                     .combine(motionGoneInArea$, R.and)
+                    .filter(R.equals(true))
                     .thru(filterAutomationEnabled(automationId))
                     .onValue(streamLogger(`${automationId} turning light off ${light}`))
                     .onValue(_ => turnLightsOff([light]))

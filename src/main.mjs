@@ -257,8 +257,8 @@ async function main() {
             .filter(R.equals(true))
 
         const _gone$ = anyBooleanEntityTrue$(entityIds)
-            // presence gone event will be sent only after 10 minutes of inactivity
-            .debounce(600 * 1000)
+            // presence gone event will be sent only after 5 minutes of inactivity
+            .debounce(300 * 1000)
             .filter(R.equals(false))
 
         return _detected$.merge(_gone$)

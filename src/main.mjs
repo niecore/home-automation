@@ -124,6 +124,9 @@ async function main() {
     // notifications
     const notify = message => haRx.callService("notify", "telegram_message", {}, { message: message })
 
+    // input select
+    const selectOption = (entityId, option) => haRx.callService("input_select", "select_option", { entity_id: entityId }, { option: option})
+
     // lights
     const anyLightsOn$ = anyBooleanEntityTrue$
     const allLightsOff$ = entityIds => anyLightsOn$(entityIds).map(R.not)
@@ -169,6 +172,14 @@ async function main() {
         return {
             on$: deviceStream.filter(R.equals("on")),
             off$: deviceStream.filter(R.equals("off"))
+        }
+    }
+
+    const aqaraTwoChannelSwitch = entityId => {
+        const deviceStream = entityState$(entityId)
+        return {
+            single_left$: deviceStream.filter(R.equals("single_left")),
+            single_right$: deviceStream.filter(R.equals("single_right"))
         }
     }
 
@@ -406,7 +417,21 @@ async function main() {
         // when light is turned on again within 10 seconds, dont proceed
         .throttle(10*1000, {leading: true, trailing: false})
         // turn light off :D
-        .onValue(_ => turnLightsOff("light.shellydimmer_db338b"))      
+        .onValue(_ => turnLightsOff("light.shellydimmer_db338b"))
+
+    // leave home automation
+    const leaveRemote = aqaraTwoChannelSwitch("sensor.remote_aqara_1_action")
+
+    leaveRemote.single_left$
+        .onValue(_ => selectOption("input_select.home_state", "home"))
+        
+    leaveRemote.single_right$
+        .onValue(_ => selectOption("input_select.home_state", "away"))
+
+    entityState$("input_select.home_state")
+        .debounce(60*1000)
+        .filter(R.equals("away"))
+        .onValue(_ => turnLightsOff("all"))
 }
 
 main()

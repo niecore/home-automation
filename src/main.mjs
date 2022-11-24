@@ -252,25 +252,33 @@ async function main() {
     const filterAutomationEnabled = automationId => filterByLogged(automationId + ": enabled ", automationEnabled$(automationId))
     
     // motion light
-    const motionDetected$ = entityIds => {
-        const _detected$ = anyBooleanEntityTrue$(entityIds)
-            .filter(R.equals(true))
 
-        const _gone$ = anyBooleanEntityTrue$(entityIds)
-            // presence gone event will be sent only after 5 minutes of inactivity
-            .debounce(300 * 1000)
-            .filter(R.equals(false))
+    const debounceValue = (value, wait) => obs => {
+        const other = obs.filter(val => val !== value)
 
-        return _detected$.merge(_gone$)
+        return obs
+            .debounce(wait)
+            .filter(R.equals(value))
+            .merge(other)
     }
+
+    const motionDetected$ = entityIds => anyBooleanEntityTrue$(entityIds)
+        .thru(debounceValue(false, 300*1000))
 
     const motionGone$ = entityIds => motionDetected$(entityIds).map(R.not)
 
     const motionLight = (id, motionSensors, luminositySensors, allLights, reactiveLights, nightReactiveLights) => {
         const disableMotionLights$ = motionGone$(motionSensors)
-        const enableMotionLight$ = motionDetected$(motionSensors)
+
+        motionDetected$(motionSensors)
             .onValue(streamLogger(`${id} motion detected`))
+
+        luminousityInRoomToLow$(luminositySensors)
+            .onValue(streamLogger(`${id} luminosity to low`))
+
+        const enableMotionLight$ = motionDetected$(motionSensors)
             .combine(luminousityInRoomToLow$(luminositySensors), R.and)
+            .skipDuplicates()
             .filter(R.equals(true))
             .thru(filterByLogged(`${id} all lights off`, allLightsOff$(allLights)))
             .thru(filterAutomationEnabled(id))
@@ -355,23 +363,26 @@ async function main() {
         .filter(roomHasLights)
         .filter(roomHasMotionSensors)
         .forEach(room => {
-            const lightShutOffTimeout = 30*60*1000; // 30 min
+            const lightShutOffTimeout = 90*60*1000; // 90 min
             const automationId = "light_power_safe";
-
-            const motionGoneInArea$ = motionGone$(home[room].motionSensors)
-                .debounce(lightShutOffTimeout)
+        
+            const motionGoneInAreaTooLong$ = motionGone$(home[room].motionSensors)
+                .thru(debounceValue(true, lightShutOffTimeout))
+                .onValue(streamLogger(`${automationId} ${room}: motion gone too long`))
 
             home[room].lights.forEach(light => {
-                const lightOnToLong$ = entityState$(light)
+                const lightOnTooLong$ = entityState$(light)
                     .map(binarayStringToBoolean)
-                    .debounce(lightShutOffTimeout)
+                    .thru(debounceValue(true, lightShutOffTimeout))
+                    .onValue(streamLogger(`${automationId} ${room} ${light}: light on too long`))
 
-                lightOnToLong$
-                    .combine(motionGoneInArea$, R.and)
+                lightOnTooLong$
+                    .combine(motionGoneInAreaTooLong$, R.and)
                     .filter(R.equals(true))
                     .thru(filterAutomationEnabled(automationId))
                     .onValue(streamLogger(`${automationId} turning light off ${light}`))
-                    .onValue(_ => turnLightsOff([light]))
+                    .onValue(_ => turnLightsOff([light])) // todo add warning of shutoff via blink
+    
         })
     });
 

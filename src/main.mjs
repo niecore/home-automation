@@ -280,6 +280,7 @@ async function main() {
 
     const motionLight = (id, motionSensors, luminositySensors, allLights, reactiveLights, nightReactiveLights) => {
         const disableMotionLights$ = motionGone$(motionSensors)
+            .onValue(streamLogger(`${id} motion gone`))
 
         motionDetected$(motionSensors)
             .onValue(streamLogger(`${id} motion detected`))

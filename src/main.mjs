@@ -151,7 +151,7 @@ async function main() {
     }
 
     // illuminance
-    const meanIlluminacaeToDark = R.gt(50)
+    const meanIlluminacaeToDark = R.gt(40)
     const luminousityInRoomToLow$ = entityIds => minOfNumericEntities$(entityIds)
         .map(meanIlluminacaeToDark)
 

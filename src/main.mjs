@@ -421,17 +421,31 @@ async function main() {
         .onValue(_ => turnLightsOff("light.shellydimmer_db338b"))
 
     // leave home automation
+    const setAtHomeState = () => selectOption("input_select.home_state", "home")
+    const setAtAwayState = () => selectOption("input_select.home_state", "away")
     const leaveRemote = aqaraTwoChannelSwitch("sensor.remote_aqara_1_action")
 
-    leaveRemote.single_left$
-        .onValue(_ => selectOption("input_select.home_state", "home"))
-        
+    // state modication
     leaveRemote.single_right$
-        .onValue(_ => selectOption("input_select.home_state", "away"))
+        .debounce(30*1000) 
+        .onValue(_ => setAtAwayState())
+        
+    leaveRemote.single_left$
+        .onValue(_ => setAtHomeState())
 
-    entityState$("input_select.home_state")
-        .debounce(60*1000)
+    booleanEntityTrue$("binary_sensor.motionsensor_aqara_7_occupancy")
+        .filter(R.equals(true))
+        .filterBy(awayState$)
+        .onValue(_ => setAtHomeState())
+
+    // state actions
+    const awayState$ = entityState$("input_select.home_state")
         .filter(R.equals("away"))
+
+    const homeState$ = entityState$("input_select.home_state")
+        .filter(R.equals("home"))        
+
+    homeState$
         .onValue(_ => turnLightsOff("all"))
 }
 

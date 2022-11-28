@@ -126,6 +126,9 @@ async function main() {
 
     // input select
     const selectOption = (entityId, option) => haRx.callService("input_select", "select_option", { entity_id: entityId }, { option: option})
+    const inputSelectState$ = R.curry((selectState, entityId) => entityState$(entityId)
+        .filter(R.equals(selectState))
+        .map(R.T))
 
     // lights
     const anyLightsOn$ = anyBooleanEntityTrue$
@@ -134,6 +137,10 @@ async function main() {
     const turnLightsOn = entityId => haRx.callService("light", "turn_on", { entity_id: entityId })
     const turnLightsOff = entityId => haRx.callService("light", "turn_off", { entity_id: entityId })
     const turnLightsOnWithBrightness = R.curry((entityId, brightness) => haRx.callService("light", "turn_on", { entity_id: entityId }, { brightness_pct: brightness }))
+    const turnWakeUpLightOn = entityId => {
+        turnLightsOnWithBrightness(entityId, 1)
+        haRx.callService("light", "turn_on", { entity_id: entityId }, {transition: 300, brightness_pct: 100 })
+    }
 
     const toggleLightsWithEvent = (toggleEvent$, lights) => {
         toggleEvent$
@@ -262,8 +269,10 @@ async function main() {
     const automationEnabled$ = automationId => booleanEntityTrue$(automationEnabledEntityId(automationId))
     const filterAutomationEnabled = automationId => filterByLogged(automationId + ": enabled ", automationEnabled$(automationId))
     
-    // motion light
+    const enableAutomation = automationId =>  haRx.callService("input_boolean", "turn_on", {entity_id: automationEnabledEntityId(automationId)})
+    const disableAutomation = automationId =>  haRx.callService("input_boolean", "turn_off", {entity_id: automationEnabledEntityId(automationId)})
 
+    // motion light
     const debounceValue = (value, wait) => obs => {
         const other = obs.filter(val => val !== value)
 
@@ -331,9 +340,9 @@ async function main() {
     toggleLightsWithEvent(tradfriRemote("sensor.remote_tradfri_4_action").toggle$, home.office.lights);
 
     const bedroomRemoteRight = tradfriRemoteSmall("sensor.remote_tradfri_small_2_action")
-    const bedroomRemoteLeft = tradfriRemoteSmall("sensor.remote_tradfri_small_1_action")
     switchLightsWithEvents(bedroomRemoteRight.on$, bedroomRemoteRight.off$, ["light.lightbulb_tradfriw_9"])
-    switchLightsWithEvents(bedroomRemoteLeft.on$, bedroomRemoteLeft.off$, ["light.lightbulb_tradfriw_8"])
+    // const bedroomRemoteLeft = tradfriRemoteSmall("sensor.remote_tradfri_small_1_action")
+    // switchLightsWithEvents(bedroomRemoteLeft.on$, bedroomRemoteLeft.off$, ["light.lightbulb_tradfriw_8"])
     
 
     // mailbox notification
@@ -420,12 +429,11 @@ async function main() {
         // turn light off :D
         .onValue(_ => turnLightsOff("light.shellydimmer_db338b"))
 
-    // leave home automation
+    // home state automations
     const setAtHomeState = () => selectOption("input_select.home_state", "home")
     const setAtAwayState = () => selectOption("input_select.home_state", "away")
     const leaveRemote = aqaraTwoChannelSwitch("sensor.remote_aqara_1_action")
 
-    // state modication
     leaveRemote.single_right$
         .debounce(30*1000) 
         .onValue(_ => setAtAwayState())
@@ -433,20 +441,34 @@ async function main() {
     leaveRemote.single_left$
         .onValue(_ => setAtHomeState())
 
-    // state actions
-    const awayState$ = entityState$("input_select.home_state")
-        .filter(R.equals("away"))
-
-    const homeState$ = entityState$("input_select.home_state")
-        .filter(R.equals("home"))        
+    const awayState$ = inputSelectState$("away", "input_select.home_state")
+    const homeState$ = inputSelectState$("home", "input_select.home_state")
 
     booleanEntityTrue$("binary_sensor.motionsensor_aqara_7_occupancy")
         .filter(R.equals(true))
         .filterBy(awayState$)
         .onValue(_ => setAtHomeState())
 
-    homeState$
+    awayState$
         .onValue(_ => turnLightsOff("all"))
+
+    // sleep state automations
+    tradfriRemoteSmall("sensor.remote_tradfri_small_1_action").on$
+        .onValue(_ => selectOption("input_select.sleep_state", "awake"))
+
+    tradfriRemoteSmall("sensor.remote_tradfri_small_1_action").off$
+        .onValue(_ => selectOption("input_select.sleep_state", "sleeping"))
+
+    inputSelectState$("waking_up", "input_select.sleep_state")
+        .onValue(_ => turnWakeUpLightOn(["light.lightbulb_tradfriw_8", "light.lightbulb_tradfriw_9"]))
+
+    inputSelectState$("sleeping", "input_select.sleep_state")
+        .onValue(_ => disableAutomation("motionlight_staircase"))
+        .onValue(_ => disableAutomation("motionlight_bedroom"))
+
+    inputSelectState$("awake", "input_select.sleep_state")
+        .onValue(_ => enableAutomation("motionlight_staircase"))
+        .onValue(_ => enableAutomation("motionlight_bedroom"))
 }
 
 main()

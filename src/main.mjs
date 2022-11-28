@@ -433,17 +433,17 @@ async function main() {
     leaveRemote.single_left$
         .onValue(_ => setAtHomeState())
 
-    booleanEntityTrue$("binary_sensor.motionsensor_aqara_7_occupancy")
-        .filter(R.equals(true))
-        .filterBy(awayState$)
-        .onValue(_ => setAtHomeState())
-
     // state actions
     const awayState$ = entityState$("input_select.home_state")
         .filter(R.equals("away"))
 
     const homeState$ = entityState$("input_select.home_state")
         .filter(R.equals("home"))        
+
+    booleanEntityTrue$("binary_sensor.motionsensor_aqara_7_occupancy")
+        .filter(R.equals(true))
+        .filterBy(awayState$)
+        .onValue(_ => setAtHomeState())
 
     homeState$
         .onValue(_ => turnLightsOff("all"))

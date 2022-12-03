@@ -124,6 +124,10 @@ async function main() {
     // notifications
     const notify = message => haRx.callService("notify", "telegram_message", {}, { message: message })
 
+    // switch
+    const switchTurnOn = entityId => haRx.callService("switch", "turn_on", { entity_id: entityId })
+    const switchTurnOff = entityId => haRx.callService("switch", "turn_off", { entity_id: entityId })
+    
     // input select
     const selectOption = (entityId, option) => haRx.callService("input_select", "select_option", { entity_id: entityId }, { option: option})
     const inputSelectState$ = R.curry((selectState, entityId) => entityState$(entityId)
@@ -451,7 +455,11 @@ async function main() {
 
     awayState$
         .onValue(_ => turnLightsOff("all"))
-
+        .onValue(_ => switchTurnOn("switch.away_mode"))
+        
+    homeState$        
+        .onValue(_ => switchTurnOff("switch.away_mode"))
+        
     // sleep state automations
     tradfriRemoteSmall("sensor.remote_tradfri_small_1_action").on$
         .onValue(_ => selectOption("input_select.sleep_state", "awake"))

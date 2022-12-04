@@ -268,6 +268,14 @@ async function main() {
     const roomHasMotionSensors = roomHasAttribute("motionSensors")
     const roomHasWindowSensors = roomHasAttribute("windowSensors")
 
+    const allHomeEntitiesOfType = type => R.pipe(
+        R.map(R.propOr([], type)),
+        R.values,
+        R.flatten
+    )(home)
+
+    const allLights = allHomeEntitiesOfType("lights");
+
     // automation config
     const automationEnabledEntityId = automationId => "input_boolean.automations_" + automationId
     const automationEnabled$ = automationId => booleanEntityTrue$(automationEnabledEntityId(automationId))
@@ -454,7 +462,7 @@ async function main() {
         .onValue(_ => setAtHomeState())
 
     awayState$
-        .onValue(_ => turnLightsOff("all"))
+        .onValue(_ => turnLightsOff(allLights))
         .onValue(_ => switchTurnOn("switch.away_mode"))
         
     homeState$        
@@ -473,6 +481,7 @@ async function main() {
     inputSelectState$("sleeping", "input_select.sleep_state")
         .onValue(_ => disableAutomation("motionlight_staircase"))
         .onValue(_ => disableAutomation("motionlight_bedroom"))
+        .onValue(_ => turnLightsOff(allLights.filter(light => !R.includes(light, home.bedroom.lights))))
 
     inputSelectState$("awake", "input_select.sleep_state")
         .onValue(_ => enableAutomation("motionlight_staircase"))

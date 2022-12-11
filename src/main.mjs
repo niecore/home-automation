@@ -44,6 +44,12 @@ async function main() {
         R.fromPairs
     )
 
+    // times
+    const seconds = R.multiply(1000)
+    const minutes = R.pipe(seconds, R.multiply(60))
+    const hours = R.pipe(minutes, R.multiply(60))
+    const days = R.pipe(minutes, R.multiply(24))
+
     // states
     const allStates$ = haRx => {
         const currentState = Kefir.fromPromise(haRx.getStates())
@@ -302,7 +308,7 @@ async function main() {
     }
 
     const motionDetected$ = entityIds => anyBooleanEntityTrue$(entityIds)
-        .thru(debounceValue(false, 300*1000))
+        .thru(debounceValue(false, minutes(5)))
 
     const motionGone$ = entityIds => motionDetected$(entityIds).map(R.not)
 
@@ -392,7 +398,7 @@ async function main() {
     const openWindowAlertId = "open_window_alert";
     allWindowContactSensors.forEach(sensor => {
         stateOfEntity$(haRx)(sensor.entity_id)
-            .debounce(10*60*1000) // 10 minutes
+            .debounce(minutes(10))
             .filter(R.propEq("state", "on"))
             .thru(filterAutomationEnabled(openWindowAlertId))
             .onValue(ev => notify(`window open for longer than 10 minutes: ${displayNameFromEvent(ev)}`))
@@ -403,7 +409,7 @@ async function main() {
         .filter(roomHasLights)
         .filter(roomHasMotionSensors)
         .forEach(room => {
-            const lightShutOffTimeout = 90*60*1000; // 90 min
+            const lightShutOffTimeout = minutes(90);
             const automationId = "light_power_safe";
         
             const motionGoneInAreaTooLong$ = motionGone$(home[room].motionSensors)
@@ -444,7 +450,7 @@ async function main() {
         // check if tv on
         .thru(filterByLogged(`${mediaAutomationId} tv turned on`, tvTurnedOn$))
         // when light is turned on again within 10 seconds, dont proceed
-        .throttle(10*1000, {leading: true, trailing: false})
+        .throttle(seconds(10), {leading: true, trailing: false})
         // turn light off :D
         .onValue(_ => turnLightsOff("light.shellydimmer_db338b"))
 
@@ -454,7 +460,7 @@ async function main() {
     const leaveRemote = aqaraTwoChannelSwitch("sensor.remote_aqara_1_action")
 
     leaveRemote.single_right$
-        .debounce(30*1000) 
+        .debounce(seconds(30)) 
         .onValue(_ => setAtAwayState())
         
     leaveRemote.single_left$
@@ -493,6 +499,20 @@ async function main() {
     inputSelectState$("awake", "input_select.sleep_state")
         .onValue(_ => enableAutomation("motionlight_staircase"))
         .onValue(_ => enableAutomation("motionlight_bedroom"))
+
+
+    // sunset trigger
+    const sunset$ = haRx.trigger$({
+        platform: "sun",
+        event: "sunset"
+    })
+
+    // christmas lights
+    const christmasLights = getMemebersOfGroups("group.christmas_lights")
+    sunset$
+        .onValue(_ => turnLightsOn(christmasLights))
+        .delay(hours(5))
+        .onValue(_ => turnLightsOff(christmasLights))
 }
 
 main()

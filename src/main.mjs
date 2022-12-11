@@ -4,7 +4,7 @@ import * as R from "ramda";
 import * as Kefir from "kefir";
 import filterByLogged from "./util/filterByLogged.mjs";
 import throttleOncePerDay from "./util/throttleOncePerDay.mjs"
-import {streamLogger} from "./util/logger.mjs"
+import {streamLogger, logger} from "./util/logger.mjs"
 
 async function main() {
     const haRx = homeassistantRx({
@@ -205,7 +205,8 @@ async function main() {
             lights: getMemebersOfGroups("light.group_livingroom_lights"),
             motionSensors: getMemebersOfGroups("binary_sensor.group_livingroom_occupancy"),
             luminositySensors: getMemebersOfGroups("group.livingroom_luminosity"),
-            windowSensors: getMemebersOfGroups("binary_sensor.group_livingroom_openings")
+            windowSensors: getMemebersOfGroups("binary_sensor.group_livingroom_openings"),
+            thermostat: "climate.livingroom"
         },
         kitchen: {
             lights: getMemebersOfGroups("light.group_kitchen_lights"),
@@ -217,6 +218,7 @@ async function main() {
             lights: getMemebersOfGroups("light.group_bedroom_lights"),
             motionSensors: getMemebersOfGroups("binary_sensor.group_bedroom_occupancy"),
             luminositySensors: getMemebersOfGroups("group.bedroom_luminosity"),
+            thermostat: "climate.bedroom"
         },
         hall: {
             lights: getMemebersOfGroups("light.group_hall_lights"),
@@ -243,21 +245,25 @@ async function main() {
             lights: getMemebersOfGroups("light.group_office_lights"),
             motionSensors: getMemebersOfGroups("binary_sensor.group_office_occupancy"),
             luminositySensors: getMemebersOfGroups("group.office_luminosity"),
-            windowSensors: getMemebersOfGroups("binary_sensor.group_office_openings")
+            windowSensors: getMemebersOfGroups("binary_sensor.group_office_openings"),
+            thermostat: "climate.office"
         },
         bathroom: {
-            windowSensors: getMemebersOfGroups("binary_sensor.group_bathroom_openings")
+            windowSensors: getMemebersOfGroups("binary_sensor.group_bathroom_openings"),
+            thermostat: "climate.bathroom"
         },
         toilette: {},
         guestroom: {
-            windowSensors: getMemebersOfGroups("binary_sensor.group_guestroom_openings")
+            windowSensors: getMemebersOfGroups("binary_sensor.group_guestroom_openings"),
+            thermostat: "climate.guestroom"
         },
         door: {},
         laundryroom: {
             lights: getMemebersOfGroups("light.group_laundryroom_lights"),
             motionSensors: getMemebersOfGroups("binary_sensor.group_laundryroom_occupancy"),
             luminositySensors: getMemebersOfGroups("group.laundryroom_luminosity"),
-            windowSensors: getMemebersOfGroups("binary_sensor.group_laundryroom_openings")
+            windowSensors: getMemebersOfGroups("binary_sensor.group_laundryroom_openings"),
+            thermostat: "climate.laundryroom"
         }
     }
 
@@ -267,6 +273,7 @@ async function main() {
     const roomHasLights = roomHasAttribute("lights")
     const roomHasMotionSensors = roomHasAttribute("motionSensors")
     const roomHasWindowSensors = roomHasAttribute("windowSensors")
+    const roomHasThermostats = roomHasAttribute("thermostat")
 
     const allHomeEntitiesOfType = type => R.pipe(
         R.map(R.propOr([], type)),
@@ -389,7 +396,7 @@ async function main() {
             .filter(R.propEq("state", "on"))
             .thru(filterAutomationEnabled(openWindowAlertId))
             .onValue(ev => notify(`window open for longer than 10 minutes: ${displayNameFromEvent(ev)}`))
-    }); 
+    });
 
     // light power safe
     rooms

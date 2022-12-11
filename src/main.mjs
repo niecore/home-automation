@@ -385,10 +385,10 @@ async function main() {
     const openWindowAlertId = "open_window_alert";
     allWindowContactSensors.forEach(sensor => {
         stateOfEntity$(haRx)(sensor.entity_id)
-            .debounce(15*60*1000) // 15 min
+            .debounce(10*60*1000) // 10 minutes
             .filter(R.propEq("state", "on"))
             .thru(filterAutomationEnabled(openWindowAlertId))
-            .onValue(ev => notify(`window open for longer than 15 minutes: ${displayNameFromEvent(ev)}`))
+            .onValue(ev => notify(`window open for longer than 10 minutes: ${displayNameFromEvent(ev)}`))
     }); 
 
     // light power safe

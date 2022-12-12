@@ -513,6 +513,9 @@ async function main() {
         .onValue(_ => turnLightsOn(christmasLights))
         .delay(hours(5))
         .onValue(_ => turnLightsOff(christmasLights))
+
+    const christmasRemote = tradfriRemoteSmall("sensor.remote_tradfri_small_3_action")
+    switchLightsWithEvents(christmasRemote.on$, christmasRemote.off$, christmasLights)        
 }
 
 main()

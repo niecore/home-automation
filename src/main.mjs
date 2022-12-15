@@ -437,7 +437,13 @@ async function main() {
         .map(R.equals("PowerOff"))
 
     const tvTurnedOn$ = tvTurnedOff$.map(R.not)
-    
+        
+    // toggle smart plug with harmony one activities
+    tvTurnedOn$.onValue(_ => switchTurnOn("switch.plug_osram_2"))
+    tvTurnedOff$
+        .delay(seconds(60))
+        .onValue(_ => switchTurnOff("switch.plug_osram_2"))
+
     const mediaAutomationId = "forbid_lights_when_tv_on";
     tvTurnedOn$
         .thru(filterAutomationEnabled(mediaAutomationId))

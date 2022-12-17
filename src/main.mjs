@@ -354,15 +354,15 @@ async function main() {
                 home[room].lights,
                 home[room].lights
             )
-    });    
+        });    
 
 
     // light controls
     toggleLightsWithEvent(tradfriRemote("sensor.remote_tradfri_1_action").toggle$, home.livingroom.lights);
-    toggleLightsWithEvent(tradfriRemote("sensor.remote_tradfri_5_action").toggle$, home.livingroom.lights);
     toggleLightsWithEvent(tradfriRemote("sensor.remote_tradfri_2_action").toggle$, home.bedroom.lights);
     toggleLightsWithEvent(tradfriRemote("sensor.remote_tradfri_3_action").toggle$, home.kitchen.lights);
     toggleLightsWithEvent(tradfriRemote("sensor.remote_tradfri_4_action").toggle$, home.office.lights);
+    toggleLightsWithEvent(tradfriRemote("sensor.remote_tradfri_5_action").toggle$, home.livingroom.lights);
 
     const bedroomRemoteRight = tradfriRemoteSmall("sensor.remote_tradfri_small_2_action")
     switchLightsWithEvents(bedroomRemoteRight.on$, bedroomRemoteRight.off$, ["light.lightbulb_tradfriw_9"])
@@ -433,19 +433,23 @@ async function main() {
     });
 
     // media automation scenes
-    const tvTurnedOff$ = entityState$("select.harmony_hub_activities")
+    const mediaOn$ = entityState$("select.harmony_hub_activities")
         .map(R.equals("PowerOff"))
-
-    const tvTurnedOn$ = tvTurnedOff$.map(R.not)
+        .map(R.not)
         
     // toggle smart plug with harmony one activities
-    tvTurnedOn$.onValue(_ => switchTurnOn("switch.plug_osram_2"))
-    tvTurnedOff$
-        .delay(seconds(60))
+    mediaOn$  
+        .filter(R.equals(true))
+        .onValue(_ => switchTurnOn("switch.plug_osram_2"))
+        
+    mediaOn$
+        .debounce(minutes(2))
+        .filter(R.equals(false))
         .onValue(_ => switchTurnOff("switch.plug_osram_2"))
 
     const mediaAutomationId = "forbid_lights_when_tv_on";
-    tvTurnedOn$
+    mediaOn$
+        .filter(R.equals(true))
         .thru(filterAutomationEnabled(mediaAutomationId))
         .onValue(_ => turnLightsOff(["light.shellydimmer_db338b"]))
 
@@ -454,7 +458,7 @@ async function main() {
         // light turned on
         .filter(R.equals(true))
         // check if tv on
-        .thru(filterByLogged(`${mediaAutomationId} tv turned on`, tvTurnedOn$))
+        .thru(filterByLogged(`${mediaAutomationId} tv turned on`, mediaOn$))
         // when light is turned on again within 10 seconds, dont proceed
         .throttle(seconds(10), {leading: true, trailing: false})
         // turn light off :D

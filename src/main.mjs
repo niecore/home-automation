@@ -104,21 +104,21 @@ async function main() {
         .filter(R.is(String))
         .map(binarayStringToBoolean)
 
-    const anyBooleanEntityTrue$ = entityIds => entities$(entityIds)
+    const anyBooleanEntityTrue$ = entityIds => Kefir.combine(R.map(entityState$, entityIds))
         .map(R.map(binarayStringToBoolean))
         .map(anyBooleanInArrayTrue)
         .skipDuplicates()
 
-    const allBooleanEntityTrue$ = entityIds => entities$(entityIds)
+    const allBooleanEntityTrue$ = entityIds => Kefir.combine(R.map(entityState$, entityIds))
         .map(R.map(binarayStringToBoolean))
         .map(allBooleanInArrayTrue)
         .skipDuplicates()
 
-    const meanOfNumericEntities$ = entityIds => entities$(entityIds)
+    const meanOfNumericEntities$ = entityIds => Kefir.combine(R.map(entityState$, entityIds))
         .map(R.mean)
         .skipDuplicates()
 
-    const minOfNumericEntities$ = entityIds => entities$(entityIds)
+    const minOfNumericEntities$ = entityIds => Kefir.combine(R.map(entityState$, entityIds))
         .map(R.reduce(R.min, Number.MAX_SAFE_INTEGER))
         .skipDuplicates()
 

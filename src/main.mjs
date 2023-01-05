@@ -27,7 +27,7 @@ async function main() {
     const devices = await haRx.getDeviceRegistry()
     const entities = await haRx.getEntityRegistry()
     const config = await haRx.getConfig()
-
+    
     // debug
     const displayStateOfEntity = id => console.log(R.filter(R.propEq("entity_id", id), state));
     const displayEntity = id => console.log(R.filter(R.propEq("entity_id", id), entities));
@@ -64,11 +64,9 @@ async function main() {
         })
     }
 
-    const stateOfEntity$ = haRx => entityId => {
+    const entity$ = entityId => {
         const currentState = Kefir.fromPromise(haRx.getStates())
-            .map(R.map(obj => R.objOf(obj.entity_id, obj)))
-            .map(R.mergeAll)
-            .map(R.prop(entityId))
+            .map(R.find(R.propEq("entity_id", entityId)))
             .toProperty()
 
         const stateChanges = haRx.events$("state_changed")
@@ -77,6 +75,8 @@ async function main() {
 
         return currentState.merge(stateChanges)
     }
+
+    const entities$ = entitdyIds => Kefir.combine(R.map(entity$, entitdyIds))
 
     // entity
     const isEntityType = R.curry((entityType, data) => R.pipe(
@@ -97,28 +97,28 @@ async function main() {
     const isDoorSensor = R.allPass([isEntityType("binary_sensor"), hasDeviceClass("door")])
     const isLuminositySensor = R.allPass([isEntityType("sensor"), hasDeviceClass("illuminance")])
 
-    const entityState$ = entityId => stateOfEntity$(haRx)(entityId)
+    const entityState$ = entityId => entity$(entityId)
         .map(R.prop("state"))
 
     const booleanEntityTrue$ = entityId => entityState$(entityId)
         .filter(R.is(String))
         .map(binarayStringToBoolean)
 
-    const anyBooleanEntityTrue$ = entityIds => Kefir.combine(R.map(entityState$, entityIds))
+    const anyBooleanEntityTrue$ = entityIds => entities$(entityIds)
         .map(R.map(binarayStringToBoolean))
         .map(anyBooleanInArrayTrue)
         .skipDuplicates()
 
-    const allBooleanEntityTrue$ = entityIds => Kefir.combine(R.map(entityState$, entityIds))
+    const allBooleanEntityTrue$ = entityIds => entities$(entityIds)
         .map(R.map(binarayStringToBoolean))
         .map(allBooleanInArrayTrue)
         .skipDuplicates()
 
-    const meanOfNumericEntities$ = entityIds => Kefir.combine(R.map(entityState$, entityIds))
+    const meanOfNumericEntities$ = entityIds => entities$(entityIds)
         .map(R.mean)
         .skipDuplicates()
 
-    const minOfNumericEntities$ = entityIds => Kefir.combine(R.map(entityState$, entityIds))
+    const minOfNumericEntities$ = entityIds => entities$(entityIds)
         .map(R.reduce(R.min, Number.MAX_SAFE_INTEGER))
         .skipDuplicates()
 
@@ -394,10 +394,13 @@ async function main() {
 
     // open window alert
     const displayNameFromEvent = ev => R.pathOr(ev.entity_id, ["attributes", "friendly_name"], ev)
-    const allWindowContactSensors = R.filter(R.anyPass([isDoorSensor, isWindowSensor]), entities);
+    const allWindowContactSensors = R.pipe(
+        R.filter(R.anyPass([isDoorSensor, isWindowSensor])), 
+        R.map(R.prop("entity_id"))
+    )(entities);
     const openWindowAlertId = "open_window_alert";
     allWindowContactSensors.forEach(sensor => {
-        stateOfEntity$(haRx)(sensor.entity_id)
+        entity$(sensor)
             .debounce(minutes(10))
             .filter(R.propEq("state", "on"))
             .thru(filterAutomationEnabled(openWindowAlertId))
@@ -487,10 +490,18 @@ async function main() {
         .filterBy(awayState$)
         .onValue(_ => setAtHomeState())
 
-    awayState$
-        .onValue(_ => turnLightsOff(allLights))
-        .onValue(_ => switchTurnOn("switch.away_mode"))
-        
+    awayState$.onValue(_ => turnLightsOff(allLights))
+    awayState$.onValue(_ => switchTurnOn("switch.away_mode"))
+
+    const nameOfOpenWindows$ = Kefir.combine(R.map(entity$, allWindowContactSensors))
+        .map(R.filter(R.propEq("state", "on")))
+        .map(R.map(displayNameFromEvent))
+
+    nameOfOpenWindows$.sampledBy(awayState$)
+        .filter(openWindows => openWindows.length > 0 )
+        .map(openWindows => `Warning: you are about the leave the house but following windows are open: ${openWindows}`)
+        .onValue(notify)
+
     homeState$        
         .onValue(_ => switchTurnOff("switch.away_mode"))
         

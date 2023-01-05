@@ -503,7 +503,7 @@ async function main() {
         .map(openWindows => `Warning: you are about the leave the house but following windows are open: ${openWindows}`)
         .onValue(notify)
 
-    const meanPowerUsage = entityState$("sensor.tasmota_mt681_power_cur")
+    const meanPowerUsage$ = entityState$("sensor.tasmota_mt681_power_cur")
         .thru(mean(seconds(30)))
 
     meanPowerUsage$.sampledBy(awayState$)

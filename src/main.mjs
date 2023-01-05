@@ -4,6 +4,7 @@ import * as R from "ramda";
 import * as Kefir from "kefir";
 import filterByLogged from "./util/filterByLogged.mjs";
 import throttleOncePerDay from "./util/throttleOncePerDay.mjs"
+import {mean} from "./util/numericStatistics.mjs"
 import {streamLogger, logger} from "./util/logger.mjs"
 
 async function main() {
@@ -502,6 +503,14 @@ async function main() {
         .map(openWindows => `Warning: you are about the leave the house but following windows are open: ${openWindows}`)
         .onValue(notify)
 
+    const meanPowerUsage = entityState$("sensor.tasmota_mt681_power_cur")
+        .thru(mean(seconds(30)))
+
+    meanPowerUsage$.sampledBy(awayState$)
+        .filter(R.lt(1000))
+        .map(meanPowerUsage => `Warning: you are about the leave the house but it seems like some devices are running. Power consumption is: ${meanPowerUsage}`)
+        .onValue(notify)
+
     homeState$        
         .onValue(_ => switchTurnOff("switch.away_mode"))
         
@@ -539,7 +548,7 @@ async function main() {
         .onValue(_ => turnLightsOff(christmasLights))
 
     const christmasRemote = tradfriRemoteSmall("sensor.remote_tradfri_small_3_action")
-    switchLightsWithEvents(christmasRemote.on$, christmasRemote.off$, christmasLights)        
+    switchLightsWithEvents(christmasRemote.on$, christmasRemote.off$, christmasLights)
 }
 
 main()

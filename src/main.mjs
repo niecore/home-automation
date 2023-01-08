@@ -256,10 +256,17 @@ async function main() {
             thermostat: "climate.office"
         },
         bathroom: {
+            lights: getMemebersOfGroups("light.group_bathroom_lights"),
+            motionSensors: getMemebersOfGroups("binary_sensor.group_bathroom_occupancy"),
+            luminositySensors: getMemebersOfGroups("group.bathroom_luminosity"),            
             windowSensors: getMemebersOfGroups("binary_sensor.group_bathroom_openings"),
             thermostat: "climate.bathroom"
         },
-        toilette: {},
+        toilette: {
+            lights: getMemebersOfGroups("light.group_toilette_lights"),
+            motionSensors: getMemebersOfGroups("binary_sensor.group_toilette_occupancy"),
+            luminositySensors: getMemebersOfGroups("group.toilette_luminosity")            
+        },
         guestroom: {
             windowSensors: getMemebersOfGroups("binary_sensor.group_guestroom_openings"),
             thermostat: "climate.guestroom"

@@ -33,6 +33,12 @@ async function main() {
     const displayStateOfEntity = id => console.log(R.filter(R.propEq("entity_id", id), state));
     const displayEntity = id => console.log(R.filter(R.propEq("entity_id", id), entities));
 
+    //displayEntity("light.group_kitchen_lights")
+    //displayEntity("binary_sensor.group_kitchen_occupancy")
+
+    //displayStateOfEntity("light.group_kitchen_lights")
+    //displayStateOfEntity("binary_sensor.group_kitchen_occupancy")
+    displayStateOfEntity("binary_sensor.motionsensor_hueoutdoor_1_occupancy")
     // util
     const mergeStreams = R.reduce((a, b) => a.merge(b), Kefir.never())
     const combineStreams = Kefir.combine
@@ -90,6 +96,7 @@ async function main() {
         return R.propEq("device_class", deviceClass, attributeOfEntity)
     }
 
+    const entityId = R.prop("entity_id")
     const isEntity = entityId => R.propEq("entity_id", entityId)
 
     const isLight = isEntityType("light")
@@ -97,6 +104,7 @@ async function main() {
     const isWindowSensor = R.allPass([isEntityType("binary_sensor"), hasDeviceClass("window")])
     const isDoorSensor = R.allPass([isEntityType("binary_sensor"), hasDeviceClass("door")])
     const isLuminositySensor = R.allPass([isEntityType("sensor"), hasDeviceClass("illuminance")])
+    const isThermostat = isEntityType("climate")
 
     const entityState$ = entityId => entity$(entityId)
         .map(R.prop("state"))
@@ -202,100 +210,64 @@ async function main() {
     }
 
     // groups
+    const entityNameIsGroup = R.pipe(
+        R.anyPass([
+            R.startsWith("light.group_"),
+            R.startsWith("binary_sensor.group_"),
+            R.startsWith("group.")
+        ])
+    )
+
     const getMemebersOfGroups = groupId => R.pipe(
         R.find(R.propEq("entity_id", groupId)),
-        R.pathOr([],["attributes","entity_id"])
+        R.pathOr([],["attributes","entity_id"]),
+        R.map(entity => {
+            // resove nested groups
+            if(entityNameIsGroup(entity)){
+                return getMemebersOfGroups(entity)
+            } else {
+                return R.find(R.propEq("entity_id", entity))(state)
+            }
+        }),
+        R.flatten
     )(state);
 
-    const home = {
-        livingroom: {
-            lights: getMemebersOfGroups("light.group_livingroom_lights"),
-            motionSensors: getMemebersOfGroups("binary_sensor.group_livingroom_occupancy"),
-            luminositySensors: getMemebersOfGroups("group.livingroom_luminosity"),
-            windowSensors: getMemebersOfGroups("binary_sensor.group_livingroom_openings"),
-            thermostat: "climate.livingroom"
-        },
-        kitchen: {
-            lights: getMemebersOfGroups("light.group_kitchen_lights"),
-            motionSensors: getMemebersOfGroups("binary_sensor.group_kitchen_occupancy"),
-            luminositySensors: getMemebersOfGroups("group.kitchen_luminosity"),
-            windowSensors: getMemebersOfGroups("binary_sensor.group_kitchen_openings")
-        },
-        bedroom: {
-            lights: getMemebersOfGroups("light.group_bedroom_lights"),
-            motionSensors: getMemebersOfGroups("binary_sensor.group_bedroom_occupancy"),
-            luminositySensors: getMemebersOfGroups("group.bedroom_luminosity"),
-            thermostat: "climate.bedroom"
-        },
-        hall: {
-            lights: getMemebersOfGroups("light.group_hall_lights"),
-            motionSensors: getMemebersOfGroups("binary_sensor.group_hall_occupancy"),
-            luminositySensors: getMemebersOfGroups("group.hall_luminosity"),
-            windowSensors: getMemebersOfGroups("binary_sensor.group_hall_openings")
-        },
-        staircase: {
-            lights: getMemebersOfGroups("light.group_staircase_lights"),
-            motionSensors: getMemebersOfGroups("binary_sensor.group_staircase_occupancy"),
-            luminositySensors: getMemebersOfGroups("group.staircase_luminosity"),
-        },
-        storage: {
-            lights: getMemebersOfGroups("light.group_storage_lights"),
-            motionSensors: getMemebersOfGroups("binary_sensor.group_storage_occupancy"),
-            luminositySensors: getMemebersOfGroups("group.storage_luminosity"),
-        },
-        garden: {
-            lights: getMemebersOfGroups("light.group_garden_lights"),
-            motionSensors: getMemebersOfGroups("binary_sensor.group_garden_occupancy"),
-            luminositySensors: getMemebersOfGroups("group.garden_luminosity"),
-        },
-        office: {
-            lights: getMemebersOfGroups("light.group_office_lights"),
-            motionSensors: getMemebersOfGroups("binary_sensor.group_office_occupancy"),
-            luminositySensors: getMemebersOfGroups("group.office_luminosity"),
-            windowSensors: getMemebersOfGroups("binary_sensor.group_office_openings"),
-            thermostat: "climate.office"
-        },
-        bathroom: {
-            lights: getMemebersOfGroups("light.group_bathroom_lights"),
-            motionSensors: getMemebersOfGroups("binary_sensor.group_bathroom_occupancy"),
-            luminositySensors: getMemebersOfGroups("group.bathroom_luminosity"),            
-            windowSensors: getMemebersOfGroups("binary_sensor.group_bathroom_openings"),
-            thermostat: "climate.bathroom"
-        },
-        toilette: {
-            lights: getMemebersOfGroups("light.group_toilette_lights"),
-            motionSensors: getMemebersOfGroups("binary_sensor.group_toilette_occupancy"),
-            luminositySensors: getMemebersOfGroups("group.toilette_luminosity")            
-        },
-        guestroom: {
-            windowSensors: getMemebersOfGroups("binary_sensor.group_guestroom_openings"),
-            thermostat: "climate.guestroom"
-        },
-        door: {},
-        laundryroom: {
-            lights: getMemebersOfGroups("light.group_laundryroom_lights"),
-            motionSensors: getMemebersOfGroups("binary_sensor.group_laundryroom_occupancy"),
-            luminositySensors: getMemebersOfGroups("group.laundryroom_luminosity"),
-            windowSensors: getMemebersOfGroups("binary_sensor.group_laundryroom_openings"),
-            thermostat: "climate.laundryroom"
-        }
-    }
+    // rooms
+    const rooms = [
+        "livingroom",
+        "kitchen",
+        "bedroom",
+        "hall",
+        "staircase",
+        "storage",
+        "garden",
+        "office",
+        "bathroom",
+        "toilette",
+        "guestroom",
+        "door",
+        "laundryroom",
+    ]
 
-    const rooms = R.keys(home)
+    const getEntityRoomGroupName = R.concat('group.');
+    const getEntitiesOfRoom = R.pipe(getEntityRoomGroupName, getMemebersOfGroups)
+    const inRoom = room => entity => R.includes(entityId(entity), getEntitiesOfRoom(room).map(entityId))
 
-    const roomHasAttribute = attr => room => home[room] && home[room][attr] && home[room][attr].length != 0;
-    const roomHasLights = roomHasAttribute("lights")
-    const roomHasMotionSensors = roomHasAttribute("motionSensors")
-    const roomHasWindowSensors = roomHasAttribute("windowSensors")
-    const roomHasThermostats = roomHasAttribute("thermostat")
-
-    const allHomeEntitiesOfType = type => R.pipe(
-        R.map(R.propOr([], type)),
-        R.values,
+    // house
+    const home = R.pipe(
+        R.map(getEntitiesOfRoom),
         R.flatten
-    )(home)
+    )(rooms)
 
-    const allLights = allHomeEntitiesOfType("lights");
+    
+
+    const roomHasLights = R.pipe(getEntitiesOfRoom, R.any(isLight))
+    const roomHasMotionSensors = R.pipe(getEntitiesOfRoom, R.any(isMotionSensor))
+    const roomHasWindowSensors = R.pipe(getEntitiesOfRoom, R.any(isWindowSensor))
+    const roomHasThermostats = R.pipe(getEntitiesOfRoom, R.any(isThermostat))
+
+
+    const allLights = home.filter(isLight)
 
     // automation config
     const automationEnabledEntityId = automationId => "input_boolean.automations_" + automationId
@@ -354,23 +326,43 @@ async function main() {
         .filter(roomHasLights)
         .filter(roomHasMotionSensors)
         .forEach(room => {
+            const entitiesInRoom = home.filter(inRoom(room))
+            const lightsInRoom = entitiesInRoom.filter(isLight).map(entityId)
+            const motionSensorsInRoom = entitiesInRoom.filter(isMotionSensor).map(entityId)
+            const luminositySensorsInRoom = entitiesInRoom.filter(isLuminositySensor).map(entityId)
+
             motionLight(
                 "motionlight_" + room,
-                home[room].motionSensors,
-                home[room].luminositySensors,
-                home[room].lights,
-                home[room].lights,
-                home[room].lights
+                motionSensorsInRoom,
+                luminositySensorsInRoom,
+                lightsInRoom,
+                lightsInRoom,
+                lightsInRoom
             )
         });    
 
 
     // light controls
-    toggleLightsWithEvent(tradfriRemote("sensor.remote_tradfri_1_action").toggle$, home.livingroom.lights);
-    toggleLightsWithEvent(tradfriRemote("sensor.remote_tradfri_2_action").toggle$, home.bedroom.lights);
-    toggleLightsWithEvent(tradfriRemote("sensor.remote_tradfri_3_action").toggle$, home.kitchen.lights);
-    toggleLightsWithEvent(tradfriRemote("sensor.remote_tradfri_4_action").toggle$, home.office.lights);
-    toggleLightsWithEvent(tradfriRemote("sensor.remote_tradfri_5_action").toggle$, home.livingroom.lights);
+    toggleLightsWithEvent(
+        tradfriRemote("sensor.remote_tradfri_1_action").toggle$, 
+        home.filter(isLight).filter(inRoom("livingroom")).map(entityId)
+    );
+    toggleLightsWithEvent(
+        tradfriRemote("sensor.remote_tradfri_2_action").toggle$,
+        home.filter(isLight).filter(inRoom("bedroom")).map(entityId)
+    )
+    toggleLightsWithEvent(
+        tradfriRemote("sensor.remote_tradfri_3_action").toggle$,
+        home.filter(isLight).filter(inRoom("kitchen")).map(entityId)
+    )
+    toggleLightsWithEvent(
+        tradfriRemote("sensor.remote_tradfri_4_action").toggle$,
+        home.filter(isLight).filter(inRoom("office")).map(entityId)
+    )
+    toggleLightsWithEvent(
+        tradfriRemote("sensor.remote_tradfri_5_action").toggle$,
+        home.filter(isLight).filter(inRoom("livingroom")).map(entityId)
+    )
 
     const bedroomRemoteRight = tradfriRemoteSmall("sensor.remote_tradfri_small_2_action")
     switchLightsWithEvents(bedroomRemoteRight.on$, bedroomRemoteRight.off$, ["light.lightbulb_tradfriw_9"])
@@ -389,7 +381,12 @@ async function main() {
 
 
     // open window rain alert
-    const roofWindowOpen$ = anyBooleanEntityTrue$(R.concat(home.laundryroom.windowSensors, home.guestroom.windowSensors))
+    const roofWindowEntites = home
+        .filter(isWindowSensor)
+        .filter(R.anyPass([inRoom("laundryroom"), inRoom("guestroom")]))
+        .map(entityId)
+
+    const roofWindowOpen$ = anyBooleanEntityTrue$(roofWindowEntites)
     const weatherForacest$ = entityState$("weather.home_hourly").skipDuplicates()
     const rainForecast$ = weatherForacest$.filter(R.equals("rainy"))
     const windowRainAlertId = "open_window_rain_alert"
@@ -402,10 +399,10 @@ async function main() {
 
     // open window alert
     const displayNameFromEvent = ev => R.pathOr(ev.entity_id, ["attributes", "friendly_name"], ev)
-    const allWindowContactSensors = R.pipe(
-        R.filter(R.anyPass([isDoorSensor, isWindowSensor])), 
-        R.map(R.prop("entity_id"))
-    )(entities);
+    const allWindowContactSensors = home
+        .filter(R.anyPass([isDoorSensor, isWindowSensor]))
+        .map(entityId)
+
     const openWindowAlertId = "open_window_alert";
     allWindowContactSensors.forEach(sensor => {
         entity$(sensor)
@@ -422,12 +419,22 @@ async function main() {
         .forEach(room => {
             const lightShutOffTimeout = minutes(90);
             const automationId = "light_power_safe";
+
+            const lightsInRoom = home
+                .filter(isLight)
+                .filter(inRoom(room))
+                .map(entityId)
+
+            const motionSensorInRoom = home
+                .filter(isMotionSensor)
+                .filter(inRoom(room))
+                .map(entityId)
         
-            const motionGoneInAreaTooLong$ = motionGone$(home[room].motionSensors)
+            const motionGoneInAreaTooLong$ = motionGone$(motionSensorInRoom)
                 .thru(debounceValue(true, lightShutOffTimeout))
                 .onValue(streamLogger(`${automationId} ${room}: motion gone too long`))
 
-            home[room].lights.forEach(light => {
+            lightsInRoom.forEach(light => {
                 const lightOnTooLong$ = entityState$(light)
                     .map(binarayStringToBoolean)
                     .thru(debounceValue(true, lightShutOffTimeout))

@@ -468,6 +468,14 @@ async function main() {
         .onValue(streamLogger(`media activity stopped, turn off plug`))
         .onValue(_ => switchTurnOff("switch.plug_osram_2"))
 
+    const motionsensorsInLivingRoom = home.filter(isMotionSensor).filter(inRoom("livingroom")).map(entityId)
+    const mediaAutoOffAutomationId = "media_auto_off";
+    motionGone$(motionsensorsInLivingRoom)
+        .thru(debounceValue(true, minutes(30)))
+        .thru(filterAutomationEnabled(mediaAutoOffAutomationId))
+        .onValue(streamLogger(`${mediaAutoOffAutomationId}: media on for 30 minutes without movement`))
+        .onValue(selectOption("select.harmony_hub_activities", "power_off"))
+
     const mediaAutomationId = "forbid_lights_when_tv_on";
     mediaOn$
         .filter(R.equals(true))

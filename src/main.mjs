@@ -259,13 +259,10 @@ async function main() {
         R.flatten
     )(rooms)
 
-    
-
     const roomHasLights = R.pipe(getEntitiesOfRoom, R.any(isLight))
     const roomHasMotionSensors = R.pipe(getEntitiesOfRoom, R.any(isMotionSensor))
     const roomHasWindowSensors = R.pipe(getEntitiesOfRoom, R.any(isWindowSensor))
     const roomHasThermostats = R.pipe(getEntitiesOfRoom, R.any(isThermostat))
-
 
     const allLights = home.filter(isLight)
 
@@ -543,18 +540,27 @@ async function main() {
     tradfriRemoteSmall("sensor.remote_tradfri_small_1_action").off$
         .onValue(_ => selectOption("input_select.sleep_state", "sleeping"))
 
+    const wakeupLights = ["light.lightbulb_tradfriw_8", "light.lightbulb_tradfriw_9"]
     inputSelectState$("waking_up", "input_select.sleep_state")
-        .onValue(_ => turnWakeUpLightOn(["light.lightbulb_tradfriw_8", "light.lightbulb_tradfriw_9"]))
+        .onValue(_ => turnWakeUpLightOn(wakeupLights))
 
     inputSelectState$("sleeping", "input_select.sleep_state")
         .onValue(_ => disableAutomation("motionlight_staircase"))
         .onValue(_ => disableAutomation("motionlight_bedroom"))
+        .onValue(_ => disableAutomation("motionlight_bathroom"))
         .onValue(_ => turnLightsOff(allLights.filter(light => !R.includes(light, home.bedroom.lights))))
 
     inputSelectState$("awake", "input_select.sleep_state")
         .onValue(_ => enableAutomation("motionlight_staircase"))
         .onValue(_ => enableAutomation("motionlight_bedroom"))
+        .onValue(_ => enableAutomation("motionlight_bathroom"))
+        .onValue(_ => turnLightsOff(wakeupLights))
 
+    const motionsensorsInStaircase = home.filter(isMotionSensor).filter(inRoom("staircase")).map(entityId)
+    anyBooleanEntityTrue$(motionsensorsInStaircase)
+        .filter(R.equals(true))
+        .filterBy(inputSelectState$("awake", "input_select.sleep_state"))
+        .onValue(_ => selectOption("input_select.sleep_state", "awake"))        
 
     // sunset trigger
     const sunset$ = haRx.trigger$({

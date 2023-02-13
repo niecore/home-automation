@@ -38,7 +38,7 @@ async function main() {
 
     //displayStateOfEntity("light.group_kitchen_lights")
     //displayStateOfEntity("binary_sensor.group_kitchen_occupancy")
-    displayStateOfEntity("binary_sensor.motionsensor_hueoutdoor_1_occupancy")
+    //displayStateOfEntity("binary_sensor.motionsensor_hueoutdoor_1_occupancy")
     // util
     const mergeStreams = R.reduce((a, b) => a.merge(b), Kefir.never())
     const combineStreams = Kefir.combine

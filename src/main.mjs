@@ -251,7 +251,8 @@ async function main() {
 
     const getEntityRoomGroupName = R.concat('group.');
     const getEntitiesOfRoom = R.pipe(getEntityRoomGroupName, getMemebersOfGroups)
-    const inRoom = room => entity => R.includes(entityId(entity), getEntitiesOfRoom(room).map(entityId))
+    const inRoom = R.curry((room, entity) => R.includes(entityId(entity), getEntitiesOfRoom(room).map(entityId)))
+    const notInRoom = R.complement(inRoom)
 
     // house
     const home = R.pipe(
@@ -544,11 +545,12 @@ async function main() {
     inputSelectState$("waking_up", "input_select.sleep_state")
         .onValue(_ => turnWakeUpLightOn(wakeupLights))
 
+    const lightsNotInBedroom = allLights.filter(notInRoom("bedroom")).map(entityId)
     inputSelectState$("sleeping", "input_select.sleep_state")
         .onValue(_ => disableAutomation("motionlight_staircase"))
         .onValue(_ => disableAutomation("motionlight_bedroom"))
         .onValue(_ => disableAutomation("motionlight_bathroom"))
-        .onValue(_ => turnLightsOff(allLights.filter(light => !R.includes(light, home.bedroom.lights))))
+        .onValue(_ => turnLightsOff(lightsNotInBedroom))
 
     inputSelectState$("awake", "input_select.sleep_state")
         .onValue(_ => enableAutomation("motionlight_staircase"))

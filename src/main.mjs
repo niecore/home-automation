@@ -511,7 +511,7 @@ async function main() {
         .filterBy(awayState$)
         .onValue(_ => setAtHomeState())
 
-    awayState$.onValue(_ => turnLightsOff(allLights))
+    awayState$.onValue(_ => turnLightsOff(allLights.map(entityId)))
     awayState$.onValue(_ => switchTurnOn("switch.away_mode"))
 
     const nameOfOpenWindows$ = Kefir.combine(R.map(entity$, allWindowContactSensors))
@@ -532,7 +532,7 @@ async function main() {
         .onValue(notify)
 
     homeState$        
-        .onValue(_ => switchTurnOff("switch.away_mode"))
+        .onValue(_ => switchTurnOff("switch.away_mode")) // thermostat off
         
     // sleep state automations
     tradfriRemoteSmall("sensor.remote_tradfri_small_1_action").on$
@@ -559,9 +559,12 @@ async function main() {
         .onValue(_ => turnLightsOff(wakeupLights))
 
     const motionsensorsInStaircase = home.filter(isMotionSensor).filter(inRoom("staircase")).map(entityId)
+    const inWakeUpState = entityState$("input_select.sleep_state")
+        .map(R.equals("waking_up"))
+
     anyBooleanEntityTrue$(motionsensorsInStaircase)
         .filter(R.equals(true))
-        .filterBy(inputSelectState$("awake", "input_select.sleep_state"))
+        .filterBy(inWakeUpState)
         .onValue(_ => selectOption("input_select.sleep_state", "awake"))        
 
     // sunset trigger

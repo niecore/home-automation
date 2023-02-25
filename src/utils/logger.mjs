@@ -1,6 +1,6 @@
 import * as winston from "winston"
 
-const logger = winston.createLogger({
+export const logger = winston.createLogger({
     level: 'debug',
     transports: [
         new winston.transports.Console()
@@ -16,6 +16,4 @@ const logger = winston.createLogger({
     ),
 });
 
-const streamLogger = id => val => logger.debug(`${id} => (${val})`);
-
-export {logger, streamLogger};
+export const streamLogger = id => val => logger.debug(`${id} => (${val})`);

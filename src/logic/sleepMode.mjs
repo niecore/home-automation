@@ -1,6 +1,6 @@
 import * as R from "ramda"
 import { entityId, anyBooleanEntityTrue$, entityState$, inputSelectState$ } from "../homeassistant/entities.mjs"
-import { selectOption } from "../homeassistant/services.mjs"
+import { inputSelectOption } from "../homeassistant/services.mjs"
 import { home } from "../domains/home.mjs"
 import { inRoom, notInRoom } from "../domains/rooms.mjs"
 import { turnLightsOff, isLight } from '../domains/lights.mjs'
@@ -11,10 +11,10 @@ import { tradfriRemoteSmall } from "../domains/remotes.mjs"
 // sleep state automations
 const sleepStateRemote = tradfriRemoteSmall("sensor.remote_tradfri_small_1_action")
 sleepStateRemote.on$
-    .onValue(_ => selectOption("input_select.sleep_state", "awake"))
+    .onValue(_ => inputSelectOption("input_select.sleep_state", "awake"))
 
 sleepStateRemote.off$
-    .onValue(_ => selectOption("input_select.sleep_state", "sleeping"))
+    .onValue(_ => inputSelectOption("input_select.sleep_state", "sleeping"))
 
 const lightsNotInBedroom = home
     .filter(isLight)
@@ -43,4 +43,4 @@ const inWakeUpState = entityState$("input_select.sleep_state")
 anyBooleanEntityTrue$(motionsensorsInStaircase)
     .filter(R.equals(true))
     .filterBy(inWakeUpState)
-    .onValue(_ => selectOption("input_select.sleep_state", "awake"))        
+    .onValue(_ => inputSelectOption("input_select.sleep_state", "awake"))        

@@ -1,14 +1,14 @@
 import * as R from "ramda"
 
-import { selectOption, switchTurnOff, switchTurnOn } from "../homeassistant/services.mjs"
+import { inputSelectOption, switchTurnOff, switchTurnOn } from "../homeassistant/services.mjs"
 import { inputSelectState$, booleanEntityTrue$, entityId } from "../homeassistant/entities.mjs"
 import { aqaraTwoChannelSwitch } from "../domains/remotes.mjs"
 import { turnLightsOff, allLights } from "../domains/lights.mjs"
 import { seconds } from "../utils/duration.mjs"
 
 // home state automations
-export const setAtHomeState = _ => selectOption("input_select.home_state", "home")
-export const setAtAwayState = _ => selectOption("input_select.home_state", "away")
+export const setAtHomeState = _ => inputSelectOption("input_select.home_state", "home")
+export const setAtAwayState = _ => inputSelectOption("input_select.home_state", "away")
 export const awayState$ = inputSelectState$("away", "input_select.home_state")
 export const homeState$ = inputSelectState$("home", "input_select.home_state")
 

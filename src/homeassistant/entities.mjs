@@ -69,6 +69,10 @@ export const minOfNumericEntities$ = entityIds => Kefir.combine(R.map(entityStat
     .map(R.reduce(R.min, Number.MAX_SAFE_INTEGER))
     .skipDuplicates()
 
+export const maxOfNumericEntities$ = entityIds => Kefir.combine(R.map(entityState$, entityIds))
+    .map(R.reduce(R.max, 0))
+    .skipDuplicates()
+
 export const inputSelectState$ = R.curry((selectState, entityId) => entityState$(entityId)
     .filter(R.equals(selectState))
     .map(R.T))    

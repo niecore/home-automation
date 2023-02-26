@@ -1,4 +1,5 @@
 import * as R from "ramda";
+import Kefir from "kefir";
 import {streamLogger} from "./logger.mjs"
 
 export const filterByLogged = (logFilter, filter$) => obs$ => {

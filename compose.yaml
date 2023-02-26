@@ -3,3 +3,7 @@ services:
   home-automation:
     image: niecore/home-automation:latest
     restart: unless-stopped
+    environment:
+      - HOMEASSISTANT_HOST
+      - HOMEASSISTANT_PORT
+      - HOMEASSISTANT_TOKEN

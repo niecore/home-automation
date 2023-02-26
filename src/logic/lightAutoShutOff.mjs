@@ -5,7 +5,7 @@ import { isLight, turnLightsOff } from '../domains/lights.mjs'
 import { isMotionSensor, motionGone$ } from '../domains/motionSensors.mjs'
 import { rooms, inRoom } from '../domains/rooms.mjs'
 import { home } from '../domains/home.mjs'
-import { entityId } from '../homeassistant/entities.mjs'
+import { entityId, booleanEntityTrue$} from '../homeassistant/entities.mjs'
 import { streamLogger } from '../utils/logger.mjs'
 import { minutes } from '../utils/duration.mjs'
 import { debounceValue } from '../utils/stream.mjs'
@@ -29,8 +29,7 @@ rooms.forEach(room => {
         .onValue(streamLogger(`${automationId} ${room}: motion gone too long`))
 
     lightsInRoom.forEach(light => {
-        const lightOnTooLong$ = entityState$(light)
-            .map(binarayStringToBoolean)
+        const lightOnTooLong$ = booleanEntityTrue$(light)
             .thru(debounceValue(true, lightShutOffTimeout))
             .onValue(streamLogger(`${automationId} ${room} ${light}: light on too long`))
         

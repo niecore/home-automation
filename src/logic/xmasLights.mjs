@@ -7,9 +7,11 @@ import { hours } from "../utils/duration.mjs"
 // christmas lights
 const christmasLights = getMemebersOfGroups("group.christmas_lights")
 const christmasRemote = tradfriRemoteSmall("sensor.remote_tradfri_small_3_action")
+const christmasAutomationId = "christmas_lights"
 
 // turn christmas lights on after sunset and leave on for 5 hours
 sunset$
+    .thru(filterAutomationEnabled(christmasAutomationId))
     .onValue(_ => turnLightsOn(christmasLights))
     .delay(hours(5))
     .onValue(_ => turnLightsOff(christmasLights))

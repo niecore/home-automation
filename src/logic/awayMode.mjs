@@ -1,8 +1,9 @@
 import * as R from "ramda"
 
 import { selectOption, switchTurnOff, switchTurnOn } from "../homeassistant/services.mjs"
+import { inputSelectState$, booleanEntityTrue$, entityId } from "../homeassistant/entities.mjs"
 import { aqaraTwoChannelSwitch } from "../domains/remotes.mjs"
-import { inputSelectState$, booleanEntityTrue$ } from "../homeassistant/entities.mjs"
+import { turnLightsOff, allLights } from "../domains/lights.mjs"
 import { seconds } from "../utils/duration.mjs"
 
 // home state automations

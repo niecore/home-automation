@@ -1,6 +1,6 @@
 import { home } from '../domains/home.mjs'
 import { tradfriRemote } from '../domains/remotes.mjs'
-import { isLight, turnLightsOff, allLightsOff$, anyLightsOn$ } from '../domains/lights.mjs'
+import { isLight, turnLightsOff, turnLightsOn, allLightsOff$, anyLightsOn$, allLights } from '../domains/lights.mjs'
 import { inRoom } from '../domains/rooms.mjs'
 import { entityId } from '../homeassistant/entities.mjs'
 
@@ -22,35 +22,35 @@ export const switchLightsWithEvents = (onEvent$, offEvent$, lights) => {
 // light controls
 toggleLightsWithEvent(
     tradfriRemote("sensor.remote_tradfri_1_action").toggle$, 
-    home.filter(isLight)
+    allLights
         .filter(inRoom("livingroom"))
         .map(entityId)
 )
 
 toggleLightsWithEvent(
     tradfriRemote("sensor.remote_tradfri_5_action").toggle$,
-    home.filter(isLight)
+    allLights
         .filter(inRoom("livingroom"))
         .map(entityId)
 )
 
 toggleLightsWithEvent(
     tradfriRemote("sensor.remote_tradfri_2_action").toggle$,
-    home.filter(isLight)
+    allLights
         .filter(inRoom("bedroom"))
         .map(entityId)
 )
 
 toggleLightsWithEvent(
     tradfriRemote("sensor.remote_tradfri_3_action").toggle$,
-    home.filter(isLight)
+    allLights
         .filter(inRoom("kitchen"))
         .map(entityId)
 )
 
 toggleLightsWithEvent(
     tradfriRemote("sensor.remote_tradfri_4_action").toggle$,
-    home.filter(isLight)
+    allLights
         .filter(inRoom("office"))
         .map(entityId)
 )

@@ -3,6 +3,7 @@ import { tradfriRemoteSmall } from "../domains/remotes.mjs"
 import { switchLightsWithEvents } from "./lightControl.mjs"
 import { sunset$ } from "../homeassistant/triggers.mjs"
 import { hours } from "../utils/duration.mjs"
+import { filterAutomationEnabled } from "../domains/automations.mjs"
 
 // christmas lights
 const christmasLights = getMemebersOfGroups("group.christmas_lights")

@@ -73,3 +73,5 @@ export const debounceValue = (value, wait) => obs => {
         .filter(R.equals(value))
         .merge(other)
 }
+
+export const filterStreamByValue = value => $ => $.filter(R.equals(value))
